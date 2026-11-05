@@ -1,43 +1,39 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
-/* =========================================================
-   1. VARIABLES & RESET
-========================================================= */
-
 :root {
   font-family: 'DM Sans', sans-serif;
   color: #202333;
-  background: #f6f7fb;
+  background: #f5f6fa;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 
-  --primary: #635bff;
-  --primary-dark: #5149ed;
+  --primary: #6258e8;
+  --primary-dark: #5147d5;
   --primary-light: #efeeff;
   --primary-soft: #f8f7ff;
 
-  --background: #f6f7fb;
+  --background: #f5f6fa;
   --surface: #ffffff;
-  --surface-secondary: #fafaff;
+  --surface-secondary: #f9f9fc;
 
   --text-primary: #202333;
   --text-secondary: #73788d;
   --text-muted: #969bad;
 
-  --border: #e8e9f0;
-  --border-light: #f0f1f6;
+  --border: #e9eaf1;
+  --border-light: #f0f1f5;
 
-  --success: #20a879;
-  --danger: #e05252;
+  --success: #199b70;
+  --danger: #dc5555;
 
-  --radius-sm: 7px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 
-  --shadow-sm: 0 2px 6px rgba(32, 35, 51, 0.03);
-  --shadow-md: 0 4px 14px rgba(32, 35, 51, 0.05);
-  --shadow-primary: 0 4px 10px rgba(99, 91, 255, 0.18);
+  --shadow-sm: 0 2px 8px rgba(32, 35, 51, 0.025);
+  --shadow-md: 0 8px 24px rgba(32, 35, 51, 0.055);
+  --shadow-primary: 0 4px 12px rgba(98, 88, 232, 0.2);
 }
 
 * {
@@ -63,14 +59,13 @@ button {
 
 button:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
-  outline: 3px solid rgba(99, 91, 255, 0.2);
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(98, 88, 232, 0.2);
   outline-offset: 2px;
 }
 
-/* =========================================================
-   2. APP LAYOUT
-========================================================= */
+/* APP */
 
 .app {
   display: flex;
@@ -80,20 +75,15 @@ textarea:focus-visible {
   background: var(--background);
 }
 
-/* =========================================================
-   3. SIDEBAR
-========================================================= */
+/* SIDEBAR */
 
 .sidebar {
-  width: 245px;
+  width: 250px;
   flex-shrink: 0;
-
   display: flex;
   flex-direction: column;
-
-  padding: 28px 18px;
-
-  background: var(--surface);
+  padding: 30px 19px;
+  background: #fff;
   border-right: 1px solid var(--border);
 }
 
@@ -101,33 +91,26 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
-
-  padding: 0 10px 34px;
+  padding: 0 10px 38px;
 }
 
 .brand-icon {
-  width: 38px;
-  height: 38px;
-
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
-
   color: white;
-  background: var(--primary);
-
-  border-radius: 11px;
-
+  background: linear-gradient(145deg, #766df5, #5147d5);
+  border-radius: 12px;
   font-family: 'Manrope', sans-serif;
   font-size: 20px;
   font-weight: 800;
-
   box-shadow: var(--shadow-primary);
 }
 
 .brand strong,
 .sidebar-bottom strong {
   display: block;
-
   font-family: 'Manrope', sans-serif;
   font-size: 14px;
   font-weight: 800;
@@ -136,50 +119,35 @@ textarea:focus-visible {
 .brand span,
 .sidebar-bottom span {
   display: block;
-
   color: var(--text-muted);
-
   font-size: 11px;
-  letter-spacing: 0.5px;
-
-  margin-top: 3px;
+  letter-spacing: 0.3px;
+  margin-top: 4px;
 }
 
 .sidebar-label {
   color: #a4a8b8;
-
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 1.2px;
-
   padding: 0 12px;
-  margin-bottom: 12px;
+  margin-bottom: 13px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
-
-  padding: 12px;
-
+  padding: 12px 13px;
   border: 1px solid transparent;
   background: transparent;
-
   color: var(--text-secondary);
-
-  border-radius: var(--radius-md);
-
+  border-radius: 10px;
   text-align: left;
   font-size: 13px;
-  font-weight: 500;
-
+  font-weight: 600;
   margin-bottom: 5px;
-
-  transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .nav-item span {
@@ -194,34 +162,28 @@ textarea:focus-visible {
 .nav-item.active {
   background: var(--primary-light);
   color: var(--primary);
-
   font-weight: 700;
+  border-color: #e7e5ff;
 }
 
 .sidebar-bottom {
   display: flex;
   align-items: center;
-  gap: 10px;
-
+  gap: 11px;
   margin-top: auto;
-
   border-top: 1px solid var(--border);
-  padding: 20px 8px 0;
+  padding: 22px 8px 0;
 }
 
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   flex-shrink: 0;
-
   display: grid;
   place-items: center;
-
   background: var(--primary-light);
   color: var(--primary);
-
-  border-radius: 50%;
-
+  border-radius: 11px;
   font-size: 12px;
   font-weight: 800;
 }
@@ -231,9 +193,7 @@ textarea:focus-visible {
   letter-spacing: 0;
 }
 
-/* =========================================================
-   4. MAIN & TOPBAR
-========================================================= */
+/* MAIN */
 
 .main {
   flex: 1;
@@ -241,15 +201,12 @@ textarea:focus-visible {
 }
 
 .topbar {
-  height: 76px;
-
+  height: 74px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-
-  padding: 0 40px;
-
-  background: var(--surface);
+  padding: 0 42px;
+  background: rgba(255, 255, 255, 0.92);
   border-bottom: 1px solid var(--border);
 }
 
@@ -266,51 +223,58 @@ textarea:focus-visible {
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .saved-status {
   display: flex;
   align-items: center;
   gap: 7px;
-
   color: var(--text-secondary);
   font-size: 12px;
-
   white-space: nowrap;
 }
 
-.saved-status:first-letter {
-  color: var(--success);
-}
-
-/* =========================================================
-   5. PAGE HEADER
-========================================================= */
+/* CONTENT */
 
 .content {
-  max-width: 1500px;
+  max-width: 1550px;
   margin: 0 auto;
-
-  padding: 38px 40px;
+  padding: 40px 42px;
 }
 
 .page-heading {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
 
-  margin-bottom: 28px;
+  margin-bottom: 32px;
+}
+
+.page-heading .eyebrow {
+  margin-bottom: 10px;
+}
+
+.page-heading h1 {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -1.2px;
+  margin-bottom: 8px;
+}
+
+.page-heading p {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 0;
 }
 
 .eyebrow {
   color: var(--primary);
-
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 1.6px;
-
-  margin-bottom: 10px;
+  letter-spacing: 1.5px;
+  margin-bottom: 11px;
 }
 
 h1,
@@ -327,83 +291,64 @@ h3 {
 }
 
 h1 {
-  font-size: 29px;
+  font-size: 30px;
   font-weight: 800;
-  letter-spacing: -1px;
-
-  margin-bottom: 8px;
+  letter-spacing: -1.1px;
+  margin-bottom: 9px;
 }
 
 .page-heading p {
   color: var(--text-secondary);
   font-size: 13px;
-
   margin-bottom: 0;
 }
 
-/* =========================================================
-   6. KPI CARDS
-========================================================= */
+/* KPI */
 
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-
-  margin-bottom: 28px;
+  gap: 17px;
+  margin-bottom: 30px;
 }
 
 .stat-card {
-  min-height: 145px;
-
+  position: relative;
+  min-height: 150px;
   display: flex;
   flex-direction: column;
-
   background: var(--surface);
-
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-
-  padding: 20px;
-
+  padding: 22px;
   box-shadow: var(--shadow-sm);
-
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
+  transition: all 0.22s ease;
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
-
+  transform: translateY(-3px);
   box-shadow: var(--shadow-md);
-  border-color: #dedcff;
+  border-color: #dedbff;
 }
 
 .stat-label {
   color: var(--text-secondary);
-
   font-size: 12px;
   font-weight: 600;
-
-  margin-bottom: 15px;
+  margin-bottom: 16px;
 }
 
 .stat-value {
   font-family: 'Manrope', sans-serif;
-
-  font-size: 29px;
+  font-size: 31px;
   font-weight: 800;
-  letter-spacing: -1px;
-
+  letter-spacing: -1.2px;
   color: var(--text-primary);
 }
 
 .stat-value span {
   font-size: 13px;
   color: var(--text-muted);
-
   font-weight: 500;
   letter-spacing: 0;
 }
@@ -411,9 +356,8 @@ h1 {
 .stat-footer {
   font-size: 12px;
   color: var(--text-muted);
-
   margin-top: auto;
-  padding-top: 10px;
+  padding-top: 11px;
 }
 
 .stat-footer.positive {
@@ -421,27 +365,21 @@ h1 {
   font-weight: 700;
 }
 
-/* =========================================================
-   7. WORKSPACE PANELS
-========================================================= */
+/* WORKSPACE */
 
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   gap: 24px;
-
   align-items: start;
 }
 
 .form-panel,
 .preview-panel {
   background: var(--surface);
-
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-
   overflow: hidden;
-
   box-shadow: var(--shadow-sm);
 }
 
@@ -449,51 +387,40 @@ h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-
-  padding: 24px;
-
+  padding: 24px 25px;
   border-bottom: 1px solid var(--border);
+  background: #fff;
 }
 
 .panel-header h2 {
   color: var(--text-primary);
-
   font-size: 15px;
   font-weight: 800;
-
-  margin-bottom: 0;
+  margin-bottom: 5px;
 }
 
 .panel-header p {
   color: var(--text-muted);
   font-size: 12px;
-
   margin-bottom: 0;
 }
 
 .step-badge {
-  min-width: 29px;
-  height: 29px;
-
+  min-width: 31px;
+  height: 31px;
   display: grid;
   place-items: center;
-
-  border-radius: 8px;
-
+  border-radius: 9px;
   background: var(--primary-light);
   color: var(--primary);
-
   font-size: 11px;
   font-weight: 800;
 }
 
-/* =========================================================
-   8. FORM SECTIONS
-========================================================= */
+/* FORM */
 
 .form-section {
-  padding: 24px;
-
+  padding: 25px;
   border-bottom: 1px solid var(--border-light);
 }
 
@@ -504,7 +431,6 @@ h1 {
 .form-section h3 {
   font-size: 13px;
   font-weight: 800;
-
   margin-bottom: 20px;
 }
 
@@ -512,27 +438,20 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-
-  margin-bottom: 18px;
-
+  margin-bottom: 19px;
   color: var(--primary);
-
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.3px;
 }
 
-/* =========================================================
-   9. INPUTS
-========================================================= */
+/* INPUTS */
 
 .field {
   display: flex;
   flex-direction: column;
   gap: 8px;
-
-  margin-bottom: 16px;
-
+  margin-bottom: 17px;
   min-width: 0;
 }
 
@@ -541,8 +460,7 @@ h1 {
 }
 
 .field label {
-  color: var(--text-secondary);
-
+  color: #555b70;
   font-size: 12px;
   font-weight: 700;
 }
@@ -552,42 +470,32 @@ h1 {
 .field select {
   width: 100%;
   min-width: 0;
-
-  padding: 11px 12px;
-
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-
-  background: var(--surface);
+  padding: 12px 13px;
+  border: 1px solid #e4e5ed;
+  border-radius: 9px;
+  background: #fff;
   color: var(--text-primary);
-
   outline: none;
-
   font-size: 13px;
-
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    background 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .field input:hover,
 .field textarea:hover,
 .field select:hover {
-  border-color: #d5d6e3;
+  border-color: #c9c8df;
 }
 
 .field input:focus,
 .field textarea:focus,
 .field select:focus {
   border-color: var(--primary);
-
-  box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(98, 88, 232, 0.09);
 }
 
 .field textarea {
   resize: vertical;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .field-row {
@@ -596,27 +504,19 @@ h1 {
   gap: 14px;
 }
 
-/* =========================================================
-   10. RELEASE & TICKET CARDS
-========================================================= */
+/* DYNAMIC CARDS */
 
 .dynamic-card {
-  padding: 16px;
-
+  padding: 17px;
   border: 1px solid var(--border);
   background: var(--surface-secondary);
-
-  border-radius: var(--radius-md);
-
+  border-radius: 11px;
   margin-bottom: 14px;
-
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .dynamic-card:hover {
-  border-color: #dedcff;
+  border-color: #dcd9ff;
   box-shadow: var(--shadow-sm);
 }
 
@@ -628,13 +528,11 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-
-  margin-bottom: 14px;
+  margin-bottom: 15px;
 }
 
 .dynamic-card-header strong {
   color: var(--text-primary);
-
   font-size: 12px;
   font-weight: 800;
 }
@@ -642,19 +540,12 @@ h1 {
 .remove-button {
   border: 0;
   background: transparent;
-
   color: var(--text-muted);
-
   font-size: 12px;
   font-weight: 600;
-
-  padding: 5px 8px;
-
-  border-radius: 6px;
-
-  transition:
-    color 0.2s ease,
-    background 0.2s ease;
+  padding: 7px 9px;
+  border-radius: 7px;
+  transition: all 0.2s ease;
 }
 
 .remove-button:hover {
@@ -662,111 +553,81 @@ h1 {
   background: #fff0f0;
 }
 
-/* =========================================================
-   11. BUTTONS
-========================================================= */
+/* BUTTONS */
 
 .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-
-  min-height: 38px;
-
+  min-height: 40px;
   border: 1px solid transparent;
-  border-radius: 8px;
-
-  padding: 10px 15px;
-
+  border-radius: 9px;
+  padding: 10px 16px;
   font-size: 12px;
   font-weight: 700;
-
   white-space: nowrap;
-
-  transition:
-    background 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .button-primary {
   color: white;
-  background: var(--primary);
-
+  background: linear-gradient(135deg, #7067ef, #574edc);
   box-shadow: var(--shadow-primary);
 }
 
 .button-primary:hover {
   background: var(--primary-dark);
-
   transform: translateY(-1px);
-
-  box-shadow: 0 5px 12px rgba(99, 91, 255, 0.22);
+  box-shadow: 0 6px 15px rgba(98, 88, 232, 0.23);
 }
 
 .button-secondary {
   color: var(--primary);
-
   background: var(--primary-light);
-  border-color: transparent;
+  border-color: #e9e7ff;
 }
 
 .button-secondary:hover {
-  background: #e4e2ff;
+  background: #e5e3ff;
 }
 
 .button-small {
-  min-height: 32px;
-
+  min-height: 34px;
   color: var(--primary);
   background: var(--primary-light);
-
-  padding: 7px 11px;
-
+  padding: 8px 12px;
   font-size: 11px;
 }
 
 .button-small:hover {
-  background: #e4e2ff;
+  background: #e5e3ff;
 }
 
-/* =========================================================
-   12. EMAIL PREVIEW
-========================================================= */
+/* EMAIL PREVIEW */
 
 .email-preview {
   margin: 24px;
-
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-
+  border-radius: 12px;
   overflow: hidden;
-
   background: var(--surface);
-
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 4px 15px rgba(32, 35, 51, 0.045);
 }
 
 .email-toolbar {
   display: flex;
   align-items: center;
-  gap: 5px;
-
-  padding: 13px 15px;
-
-  background: #f7f8fc;
-
+  gap: 6px;
+  padding: 14px 16px;
+  background: #f8f8fb;
   border-bottom: 1px solid var(--border);
 }
 
 .email-dot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   flex-shrink: 0;
-
   border-radius: 50%;
 }
 
@@ -783,11 +644,9 @@ h1 {
 }
 
 .email-toolbar-label {
-  margin-left: 9px;
-
+  margin-left: 10px;
   font-size: 11px;
   color: var(--text-secondary);
-
   font-weight: 700;
   letter-spacing: 0.3px;
 }
@@ -795,11 +654,8 @@ h1 {
 .email-subject {
   display: flex;
   gap: 12px;
-
-  padding: 15px;
-
+  padding: 16px;
   border-bottom: 1px solid var(--border-light);
-
   font-size: 12px;
 }
 
@@ -812,29 +668,21 @@ h1 {
 }
 
 .email-body {
-  padding: 20px 16px;
-
+  padding: 22px 18px;
   max-height: 750px;
   overflow-y: auto;
-
   background: white;
 }
 
 .email-body pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-
   font-family: 'DM Sans', sans-serif;
-
   font-size: 11px;
   line-height: 1.8;
-
   color: #484c5e;
-
   margin: 0;
 }
-
-/* HTML généré dans l'aperçu */
 
 .html-email-preview {
   width: 100%;
@@ -845,14 +693,11 @@ h1 {
   max-width: 100%;
 }
 
-/* =========================================================
-   13. PREVIEW ACTIONS & HELPER
-========================================================= */
+/* PREVIEW ACTIONS */
 
 .preview-actions {
   display: flex;
   gap: 10px;
-
   padding: 0 24px 24px;
 }
 
@@ -864,51 +709,38 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 8px;
-
   background: var(--primary-soft);
-
   margin: 0 24px 24px;
-  padding: 16px;
-
+  padding: 17px;
   border: 1px solid #eeecff;
-  border-radius: var(--radius-md);
+  border-radius: 11px;
 }
 
 .helper-card > span {
-  font-size: 17px;
+  font-size: 18px;
 }
 
 .helper-card strong {
   display: block;
-
   color: var(--primary);
-
   font-size: 12px;
   font-weight: 800;
-
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
 .helper-card p {
   color: var(--text-secondary);
-
   font-size: 12px;
   line-height: 1.7;
-
   margin-bottom: 0;
 }
 
-/* =========================================================
-   14. FOOTER
-========================================================= */
+/* FOOTER */
 
 .footer {
   text-align: center;
-
   padding: 30px 0 10px;
-
   color: var(--text-muted);
-
   font-size: 11px;
 }
 
@@ -917,21 +749,19 @@ h1 {
   color: var(--primary);
 }
 
-/* =========================================================
-   15. RESPONSIVE — TABLET
-========================================================= */
+/* RESPONSIVE */
 
 @media (max-width: 1200px) {
   .sidebar {
-    width: 210px;
+    width: 215px;
   }
 
   .content {
-    padding: 30px 24px;
+    padding: 30px 25px;
   }
 
   .topbar {
-    padding: 0 24px;
+    padding: 0 25px;
   }
 
   .workspace {
@@ -943,10 +773,6 @@ h1 {
   }
 }
 
-/* =========================================================
-   16. RESPONSIVE — MOBILE
-========================================================= */
-
 @media (max-width: 760px) {
   .sidebar {
     display: none;
@@ -955,7 +781,6 @@ h1 {
   .topbar {
     height: auto;
     min-height: 68px;
-
     padding: 12px 16px;
   }
 
@@ -982,7 +807,7 @@ h1 {
   }
 
   h1 {
-    font-size: 24px;
+    font-size: 25px;
   }
 
   .stats-grid {
@@ -992,7 +817,7 @@ h1 {
 
   .stat-card {
     min-height: 125px;
-    padding: 15px;
+    padding: 16px;
   }
 
   .stat-label {
@@ -1001,7 +826,7 @@ h1 {
   }
 
   .stat-value {
-    font-size: 24px;
+    font-size: 25px;
   }
 
   .field-row {
@@ -1011,7 +836,7 @@ h1 {
 
   .panel-header,
   .form-section {
-    padding: 18px;
+    padding: 19px;
   }
 
   .email-preview {
@@ -1032,20 +857,6 @@ h1 {
   }
 }
 
-/* =========================================================
-   17. ACCESSIBILITY & SMALL SCREEN FIXES
-========================================================= */
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-  }
-}
-
 @media (max-width: 420px) {
   .topbar-actions {
     flex-wrap: wrap;
@@ -1061,5 +872,365 @@ h1 {
 
   .stat-card {
     min-height: 110px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* KPI — Progression de la vélocité */
+
+.stat-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kpi-icon {
+  width: 28px;
+  height: 28px;
+
+  display: grid;
+  place-items: center;
+
+  background: var(--primary-light);
+  color: var(--primary);
+
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+.velocity-progress {
+  width: 100%;
+  height: 6px;
+
+  margin-top: 13px;
+
+  background: #eeedf5;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.velocity-progress-fill {
+  height: 100%;
+
+  background: var(--primary);
+  border-radius: 20px;
+
+  transition: width 0.4s ease;
+}
+
+.velocity-progress-fill.complete {
+  background: var(--success);
+}
+
+/* =========================================================
+   KPI — DESIGN IMPROVEMENT
+========================================================= */
+
+.stat-card {
+  position: relative;
+  min-height: 155px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.stat-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.stat-top .stat-label {
+  margin-bottom: 0;
+}
+
+.kpi-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.kpi-icon.purple {
+  color: #635bff;
+  background: #efeeff;
+}
+
+.kpi-icon.green {
+  color: #159b70;
+  background: #e7f8f1;
+}
+
+.kpi-icon.orange {
+  color: #dc9235;
+  background: #fff4e5;
+}
+
+.kpi-icon.red {
+  color: #df6262;
+  background: #fff0f0;
+}
+
+.stat-value {
+  font-size: 30px;
+  letter-spacing: -1.2px;
+}
+
+.stat-footer {
+  font-size: 12px;
+}
+
+.stat-footer.positive {
+  color: #159b70;
+  font-weight: 700;
+}
+
+.velocity-progress {
+  height: 5px;
+  margin-top: 12px;
+  background: #e9f3ee;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.velocity-progress-fill {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.4s ease;
+}
+
+.velocity-progress-fill.complete {
+  background: #20a879;
+}
+
+.stat-card:hover .kpi-icon {
+  transform: scale(1.06);
+  transition: transform 0.2s ease;
+}
+
+/* =========================================================
+   FORM — SECTION DESIGN
+========================================================= */
+
+.form-section {
+  padding: 28px 26px;
+  border-bottom: 1px solid #f0f0f5;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin-bottom: 22px;
+
+  color: #34364a;
+  font-family: 'Manrope', sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.section-heading::before {
+  content: "";
+  width: 4px;
+  height: 19px;
+
+  background: var(--primary);
+  border-radius: 5px;
+}
+
+/* Champs */
+
+.field {
+  gap: 9px;
+  margin-bottom: 19px;
+}
+
+.field label {
+  color: #555a70;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.field input,
+.field textarea,
+.field select {
+  min-height: 42px;
+  padding: 11px 13px;
+
+  border: 1px solid #e5e6ef;
+  border-radius: 8px;
+
+  background: #fcfcfe;
+
+  font-size: 13px;
+
+  transition: all 0.2s ease;
+}
+
+.field input:hover,
+.field textarea:hover {
+  background: white;
+  border-color: #c9c5ff;
+}
+
+.field input:focus,
+.field textarea:focus {
+  background: white;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.08);
+}
+
+/* Cartes dynamiques */
+
+.dynamic-card {
+  padding: 19px;
+  margin-bottom: 15px;
+
+  background: #fafaff;
+  border: 1px solid #ececf4;
+  border-radius: 11px;
+
+  transition: all 0.2s ease;
+}
+
+.dynamic-card:hover {
+  background: white;
+  border-color: #dcd9ff;
+  box-shadow: 0 4px 12px rgba(32, 35, 51, 0.04);
+}
+
+.dynamic-card-header {
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ededf4;
+}
+
+.dynamic-card-header strong {
+  font-family: 'Manrope', sans-serif;
+  font-size: 12px;
+}
+
+/* Boutons d'ajout */
+
+.button-secondary {
+  border: 1px dashed #c9c5ff;
+  background: #f8f7ff;
+}
+
+.button-secondary:hover {
+  border-color: var(--primary);
+  background: #efeeff;
+}
+
+/* =========================================================
+   ALIGNEMENT GLOBAL DES TITRES
+========================================================= */
+
+/* Titre principal de la page */
+.page-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  margin-bottom: 32px;
+}
+
+.page-heading h1 {
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+  line-height: 1.25;
+}
+
+.page-heading p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* Titres des panneaux */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 80px;
+  padding: 22px 25px;
+}
+
+.panel-header h2 {
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Titres des sections du formulaire */
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 24px;
+  text-align: left;
+  line-height: 1.4;
+}
+
+/* Trait violet */
+.section-heading::before {
+  content: "";
+  display: block;
+  flex: 0 0 4px;
+  width: 4px;
+  height: 20px;
+  background: var(--primary);
+  border-radius: 5px;
+}
+
+/* Titres des cartes KPI */
+.stat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+}
+
+.stat-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+}
+
+/* Alignement des titres des cartes */
+.dynamic-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Responsive */
+@media (max-width: 760px) {
+  .page-heading h1 {
+    font-size: 25px;
+  }
+
+  .panel-header {
+    padding: 19px;
+  }
+
+  .section-heading {
+    font-size: 12px;
   }
 }

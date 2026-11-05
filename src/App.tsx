@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
+
+// ==========================================
+// TYPES
+// ==========================================
 
 type Release = {
   version: string;
@@ -32,6 +36,24 @@ type Sprint = {
   reportLink: string;
   signatories: string;
 };
+
+type SprintHistoryItem = {
+  id: string;
+  savedAt: string;
+  sprint: Sprint;
+  releases: Release[];
+  tickets: Ticket[];
+};
+
+type SavedData = {
+  sprint?: Partial<Sprint>;
+  releases?: Release[];
+  tickets?: Ticket[];
+};
+
+// ==========================================
+// DONNÉES INITIALES
+// ==========================================
 
 const initialSprint: Sprint = {
   name: "Sprint 145",
@@ -96,6 +118,29 @@ const initialTickets: Ticket[] = [
   },
 ];
 
+// ==========================================
+// UTILITAIRES
+// ==========================================
+
+const loadSavedData = (): SavedData => {
+  try {
+    const saved = localStorage.getItem("sprintly-data");
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+};
+
+const loadSprintHistory = (): SprintHistoryItem[] => {
+  try {
+    const saved = localStorage.getItem("sprintly-history");
+    const parsed = saved ? JSON.parse(saved) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 const formatDate = (date: string) => {
   if (!date) return "";
 
@@ -127,14 +172,64 @@ const escapeHtml = (value: string | number) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
-const isValidLink = (link: string) => /^https?:\/\//i.test(link.trim());
+const isValidLink = (link: string) =>
+  /^https?:\/\//i.test(link.trim());
+
+// ==========================================
+// APPLICATION
+// ==========================================
 
 function App() {
-  const [sprint, setSprint] = useState<Sprint>(initialSprint);
-  const [releases, setReleases] = useState<Release[]>(initialReleases);
-  const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
+  const [savedData] = useState<SavedData>(loadSavedData);
+
+  const [sprint, setSprint] = useState<Sprint>(() => ({
+    ...initialSprint,
+    ...savedData.sprint,
+  }));
+
+  const [releases, setReleases] = useState<Release[]>(() =>
+    Array.isArray(savedData.releases)
+      ? savedData.releases
+      : initialReleases
+  );
+
+  const [tickets, setTickets] = useState<Ticket[]>(() =>
+    Array.isArray(savedData.tickets)
+      ? savedData.tickets
+      : initialTickets
+  );
+
+  const [history, setHistory] =
+    useState<SprintHistoryItem[]>(loadSprintHistory);
+
   const [activeTab, setActiveTab] = useState("general");
   const [copied, setCopied] = useState(false);
+
+  // ==========================================
+  // SAUVEGARDE AUTOMATIQUE
+  // ==========================================
+
+  useEffect(() => {
+    localStorage.setItem(
+      "sprintly-data",
+      JSON.stringify({
+        sprint,
+        releases,
+        tickets,
+      })
+    );
+  }, [sprint, releases, tickets]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "sprintly-history",
+      JSON.stringify(history)
+    );
+  }, [history]);
+
+  // ==========================================
+  // CALCULS KPI
+  // ==========================================
 
   const remainingPoints = tickets.reduce(
     (total, ticket) => total + Number(ticket.points || 0),
@@ -143,25 +238,40 @@ function App() {
 
   const velocityPercentage =
     sprint.plannedVelocity > 0
-      ? Math.round((sprint.actualVelocity / sprint.plannedVelocity) * 100)
+      ? Math.round(
+          (sprint.actualVelocity / sprint.plannedVelocity) * 100
+        )
       : 0;
 
   const initialPercentage =
     sprint.plannedVelocity > 0
-      ? Math.round((sprint.startPoints / sprint.plannedVelocity) * 100)
+      ? Math.round(
+          (sprint.startPoints / sprint.plannedVelocity) * 100
+        )
       : 0;
 
   const addedPercentage =
     sprint.plannedVelocity > 0
-      ? Math.round((sprint.addedPoints / sprint.plannedVelocity) * 100)
+      ? Math.round(
+          (sprint.addedPoints / sprint.plannedVelocity) * 100
+        )
       : 0;
 
   const bugPercentage =
     sprint.actualVelocity > 0
-      ? Math.round((sprint.bugPoints / sprint.actualVelocity) * 100)
+      ? Math.round(
+          (sprint.bugPoints / sprint.actualVelocity) * 100
+        )
       : 0;
 
-  const updateSprint = (field: keyof Sprint, value: string | number) => {
+  // ==========================================
+  // MISE À JOUR DES DONNÉES
+  // ==========================================
+
+  const updateSprint = (
+    field: keyof Sprint,
+    value: string | number
+  ) => {
     setSprint((previous) => ({
       ...previous,
       [field]: value,
@@ -175,7 +285,9 @@ function App() {
   ) => {
     setReleases((previous) =>
       previous.map((release, i) =>
-        i === index ? { ...release, [field]: value } : release
+        i === index
+          ? { ...release, [field]: value }
+          : release
       )
     );
   };
@@ -194,7 +306,9 @@ function App() {
   };
 
   const removeRelease = (index: number) => {
-    setReleases((previous) => previous.filter((_, i) => i !== index));
+    setReleases((previous) =>
+      previous.filter((_, i) => i !== index)
+    );
   };
 
   const updateTicket = (
@@ -204,7 +318,9 @@ function App() {
   ) => {
     setTickets((previous) =>
       previous.map((ticket, i) =>
-        i === index ? { ...ticket, [field]: value } : ticket
+        i === index
+          ? { ...ticket, [field]: value }
+          : ticket
       )
     );
   };
@@ -221,94 +337,210 @@ function App() {
   };
 
   const removeTicket = (index: number) => {
-    setTickets((previous) => previous.filter((_, i) => i !== index));
+    setTickets((previous) =>
+      previous.filter((_, i) => i !== index)
+    );
   };
 
-  const generateReport = () => {
-    const objectivesHtml = sprint.objectives
-      .split(/\n/)
-      .map((objective) => objective.trim())
-      .filter(Boolean)
-      .map(
-        (objective) => `
-          <li style="font-size:14px;line-height:22px;margin-bottom:6px;color:#333333;">
-            ${escapeHtml(objective)}
-          </li>
-        `
+  // ==========================================
+  // HISTORIQUE DES SPRINTS
+  // ==========================================
+
+  const saveSprintToHistory = () => {
+    const newItem: SprintHistoryItem = {
+      id: crypto.randomUUID(),
+      savedAt: new Date().toISOString(),
+      sprint: { ...sprint },
+      releases: releases.map((release) => ({ ...release })),
+      tickets: tickets.map((ticket) => ({ ...ticket })),
+    };
+
+    setHistory((previous) => [
+      newItem,
+      ...previous,
+    ]);
+
+    alert(
+      `${sprint.name} a été enregistré dans l'historique.`
+    );
+  };
+
+  const loadSprintFromHistory = (
+    item: SprintHistoryItem
+  ) => {
+    setSprint({ ...item.sprint });
+
+    setReleases(
+      item.releases.map((release) => ({ ...release }))
+    );
+
+    setTickets(
+      item.tickets.map((ticket) => ({ ...ticket }))
+    );
+
+    setActiveTab("general");
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  const deleteSprintFromHistory = (id: string) => {
+    if (
+      !window.confirm(
+        "Supprimer ce sprint de l'historique ?"
       )
-      .join("");
+    ) {
+      return;
+    }
 
-    const releaseHtml = releases
-  .map(
-    (release) => `
-      <tr style="background-color:#ffffff;font-family:Arial,Helvetica,sans-serif;">
-        <td style="width:40%;padding:14px 12px;border-bottom:1px solid #eeeeee;vertical-align:middle;text-align:left;">
-          <div style="font-size:13px;line-height:20px;color:#222222;">
-            <strong>${escapeHtml(release.version)}</strong>
-          </div>
-          ${
-            release.description
-              ? `<div style="font-size:11px;line-height:17px;color:#555555;margin-top:3px;">${escapeHtml(release.description)}</div>`
-              : ""
-          }
-          <div style="font-size:11px;line-height:17px;color:#777777;margin-top:3px;">
-            ${escapeHtml(formatDate(release.date))}
-          </div>
-        </td>
+    setHistory((previous) =>
+      previous.filter((item) => item.id !== id)
+    );
+  };
 
-        <td style="width:30%;padding:14px 12px;border-bottom:1px solid #eeeeee;vertical-align:middle;text-align:left;font-size:13px;line-height:20px;color:#333333;">
-          ${escapeHtml(release.name)}
-        </td>
+  const duplicateSprintFromHistory = (
+    item: SprintHistoryItem
+  ) => {
+    setSprint({
+      ...item.sprint,
+      name: `${item.sprint.name} (copie)`,
+    });
 
-        <td align="center" style="width:30%;padding:14px 12px;border-bottom:1px solid #eeeeee;vertical-align:middle;text-align:center;">
-          ${
-            isValidLink(release.link)
-              ? `
-                <a href="${escapeHtml(release.link)}"
-                   style="display:inline-block;background-color:#111111;color:#ffffff;text-decoration:none;padding:10px 12px;font-size:11px;line-height:16px;font-weight:bold;white-space:nowrap;">
-                  Voir les tickets →
-                </a>
-              `
-              : `<span style="font-size:11px;color:#999999;">Lien à ajouter</span>`
-          }
-        </td>
-      </tr>
-    `
-  )
-  .join("");
+    setReleases(
+      item.releases.map((release) => ({ ...release }))
+    );
 
-    const ticketHtml = tickets
-      .map(
-        (ticket) => `
-          <tr>
-            <td style="padding:11px 12px;border-bottom:1px solid #eeeeee;font-size:11px;line-height:17px;color:#555555;">
-              ${escapeHtml(ticket.key)}
-            </td>
-            <td style="padding:11px 12px;border-bottom:1px solid #eeeeee;font-size:13px;line-height:19px;color:#333333;">
-              ${escapeHtml(ticket.title)}
-            </td>
-            <td align="right" style="padding:11px 12px;border-bottom:1px solid #eeeeee;font-size:13px;line-height:19px;font-weight:bold;color:#222222;white-space:nowrap;">
-              ${escapeHtml(ticket.points)} pts
-            </td>
-          </tr>
-        `
-      )
-      .join("");
+    setTickets(
+      item.tickets.map((ticket) => ({ ...ticket }))
+    );
 
-    const reportLinkHtml = isValidLink(sprint.reportLink)
-      ? `
+    setActiveTab("general");
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  // ==========================================
+  // GÉNÉRATION DU RAPPORT HTML
+  // ==========================================
+
+  // ==========================================
+// GÉNÉRATION DU RAPPORT HTML — BLACK & WHITE
+// ==========================================
+
+const generateReport = () => {
+  const objectivesHtml = sprint.objectives
+    .split("\n")
+    .filter(Boolean)
+    .map(
+      (objective) => `
         <tr>
-          <td style="padding:28px 36px 10px;">
-            <a href="${escapeHtml(sprint.reportLink)}"
-               style="display:inline-block;background-color:#111111;color:#ffffff;text-decoration:none;padding:13px 20px;font-size:12px;line-height:18px;font-weight:bold;">
-              Voir le rapport complet du sprint →
-            </a>
+          <td style="padding:6px 0;font-size:13px;line-height:21px;color:#222;">
+            <span style="color:#111;font-weight:bold;padding-right:9px;">—</span>
+            ${escapeHtml(objective)}
           </td>
         </tr>
       `
-      : "";
+    )
+    .join("");
 
-    return `
+  const releaseHtml = releases.length
+    ? releases
+        .map(
+          (release) => `
+            <tr>
+              <td style="padding:15px 12px;border-bottom:1px solid #e5e5e5;">
+                <strong style="color:#111;">${escapeHtml(
+                  release.version || "Version à définir"
+                )}</strong>
+                <div style="font-size:11px;color:#777;margin-top:3px;">
+                  ${escapeHtml(formatDate(release.date))}
+                </div>
+              </td>
+
+              <td style="padding:15px 12px;border-bottom:1px solid #e5e5e5;font-size:13px;color:#222;">
+                ${escapeHtml(release.name)}
+                ${
+                  release.description
+                    ? `<div style="font-size:11px;color:#777;margin-top:3px;">${escapeHtml(
+                        release.description
+                      )}</div>`
+                    : ""
+                }
+              </td>
+
+              <td align="right" style="padding:15px 12px;border-bottom:1px solid #e5e5e5;">
+                ${
+                  isValidLink(release.link)
+                    ? `<a href="${escapeHtml(
+                        release.link
+                      )}" style="color:#111;font-size:11px;text-decoration:underline;font-weight:bold;">Voir Jira →</a>`
+                    : `<span style="color:#999;">—</span>`
+                }
+              </td>
+            </tr>
+          `
+        )
+        .join("")
+    : `
+      <tr>
+        <td colspan="3" style="padding:18px;color:#777;">
+          Aucune release renseignée.
+        </td>
+      </tr>
+    `;
+
+  const ticketHtml = tickets.length
+    ? tickets
+        .map(
+          (ticket) => `
+            <tr>
+              <td style="padding:12px;border-bottom:1px solid #e5e5e5;font-size:11px;color:#777;">
+                ${escapeHtml(ticket.key)}
+              </td>
+
+              <td style="padding:12px;border-bottom:1px solid #e5e5e5;font-size:13px;color:#222;">
+                ${escapeHtml(ticket.title)}
+              </td>
+
+              <td align="right" style="padding:12px;border-bottom:1px solid #e5e5e5;color:#111;font-weight:bold;">
+                ${escapeHtml(ticket.points)} pts
+              </td>
+            </tr>
+          `
+        )
+        .join("")
+    : `
+      <tr>
+        <td colspan="3" style="padding:18px;color:#777;">
+          Aucun ticket restant.
+        </td>
+      </tr>
+    `;
+
+  const reportLinkHtml = isValidLink(sprint.reportLink)
+    ? `
+      <tr>
+        <td style="padding:25px 32px;">
+          <a href="${escapeHtml(sprint.reportLink)}"
+             style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:13px 19px;font-size:12px;font-weight:bold;">
+            Consulter le rapport complet →
+          </a>
+        </td>
+      </tr>
+    `
+    : "";
+
+  const progressWidth = Math.min(
+    100,
+    Math.max(0, velocityPercentage)
+  );
+
+  return `
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -317,204 +549,299 @@ function App() {
 <title>${escapeHtml(sprint.name)} - Sprint Report</title>
 </head>
 
-<body style="margin:0;padding:0;background-color:#f3f3f3;font-family:Arial,Helvetica,sans-serif;color:#333333;">
+<body style="margin:0;padding:0;background:#f1f1f1;font-family:Arial,Helvetica,sans-serif;color:#171717;">
 
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f3f3f3;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f1f1;">
 <tr>
 <td align="center" style="padding:30px 12px;">
 
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:680px;background-color:#ffffff;">
+<table width="100%" cellpadding="0" cellspacing="0"
+style="max-width:680px;background:#fff;border-collapse:collapse;">
 
-<!-- BANDEAU NOIR -->
+<!-- HEADER -->
+
 <tr>
-<td style="background-color:#111111;padding:34px 36px;color:#ffffff;">
+<td style="background:#111;padding:36px 32px;">
 
-  <div style="font-size:11px;line-height:17px;font-weight:bold;letter-spacing:3px;color:#bbbbbb;margin-bottom:16px;">
-    SPRINT REPORT
-  </div>
+<div style="font-size:11px;letter-spacing:3px;color:#aaa;margin-bottom:18px;">
+SPRINT REPORT
+</div>
 
-  <div style="font-size:30px;line-height:36px;font-weight:bold;color:#ffffff;margin-bottom:12px;">
-    ${escapeHtml(sprint.name)}
-  </div>
+<div style="font-size:30px;line-height:38px;font-weight:bold;color:#fff;">
+${escapeHtml(sprint.name)}
+</div>
+
+<div style="font-size:12px;color:#ccc;margin-top:12px;">
+${escapeHtml(formatDate(sprint.startDate))}
+&nbsp; — &nbsp;
+${escapeHtml(formatDate(sprint.endDate))}
+</div>
+
 </td>
 </tr>
 
 <!-- INTRODUCTION -->
+
 <tr>
-<td style="padding:30px 36px 10px;font-size:14px;line-height:23px;color:#444444;">
-  Bonjour à tous,<br /><br />
-  Voici le récapitulatif du <strong>${escapeHtml(sprint.name)}</strong>
-  qui s'est déroulé du ${escapeHtml(formatLongDate(sprint.startDate))}
-  au ${escapeHtml(formatLongDate(sprint.endDate))}.
+<td style="padding:30px 32px;font-size:13px;line-height:23px;color:#444;">
+
+Bonjour à tous,<br><br>
+
+Voici le récapitulatif du
+<strong>${escapeHtml(sprint.name)}</strong>,
+qui s'est déroulé du
+${escapeHtml(formatLongDate(sprint.startDate))}
+au
+${escapeHtml(formatLongDate(sprint.endDate))}.
+
 </td>
 </tr>
 
 <!-- OBJECTIFS -->
-<tr>
-<td style="padding:22px 36px 10px;">
-  <div style="font-size:11px;line-height:17px;font-weight:bold;letter-spacing:1.5px;color:#888888;margin-bottom:12px;">
-    OBJECTIFS DU SPRINT
-  </div>
 
-  <ul style="margin:0;padding-left:20px;">
-    ${objectivesHtml}
-  </ul>
+<tr>
+<td style="padding:8px 32px 25px;">
+
+<table width="100%" cellpadding="0" cellspacing="0"
+style="background:#f7f7f7;border-left:4px solid #111;">
+
+<tr>
+<td style="padding:19px 20px;">
+
+<div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#111;margin-bottom:12px;">
+OBJECTIFS DU SPRINT
+</div>
+
+<table width="100%" cellpadding="0" cellspacing="0">
+${objectivesHtml}
+</table>
+
+</td>
+</tr>
+</table>
+
 </td>
 </tr>
 
 <!-- RELEASES -->
-<tr>
-<td style="padding:25px 36px 10px;">
-  <div style="font-size:11px;line-height:17px;font-weight:bold;letter-spacing:1.5px;color:#888888;margin-bottom:14px;">
-    RELEASES
-  </div>
 
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-    <tr style="background-color:#f5f5f5;">
-      <th align="left" style="padding:11px 12px;font-size:11px;line-height:16px;letter-spacing:1px;color:#777777;">VERSION</th>
-      <th align="left" style="padding:11px 12px;font-size:11px;line-height:16px;letter-spacing:1px;color:#777777;">APPLICATION</th>
-      <th align="right" style="padding:11px 12px;font-size:11px;line-height:16px;letter-spacing:1px;color:#777777;">TICKETS</th>
-    </tr>
-    ${releaseHtml}
-  </table>
+<tr>
+<td style="padding:10px 32px 25px;">
+
+<div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#777;margin-bottom:15px;">
+01 / RELEASES
+</div>
+
+<table width="100%" cellpadding="0" cellspacing="0"
+style="border-collapse:collapse;table-layout:fixed;">
+
+<tr style="background:#111;color:#fff;">
+<th width="30%" align="left" style="padding:12px;font-size:11px;color:#fff;">VERSION</th>
+<th width="40%" align="left" style="padding:12px;font-size:11px;color:#fff;">APPLICATION</th>
+<th width="30%" align="right" style="padding:12px;font-size:11px;color:#fff;">LIEN</th>
+</tr>
+
+${releaseHtml}
+
+</table>
 </td>
 </tr>
 
-<!-- KPI -->
+<!-- VELOCITY -->
+
 <tr>
-<td style="padding:30px 36px 10px;">
-  <div style="font-size:11px;line-height:17px;font-weight:bold;letter-spacing:1.5px;color:#888888;margin-bottom:14px;">
-    SPRINT VELOCITY
-  </div>
+<td style="padding:15px 32px 25px;">
 
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;border-collapse:collapse;">
-    <tr>
-      <td width="50%" style="padding:16px;background-color:#f5f5f5;border:1px solid #eeeeee;height:100px;vertical-align:top;">
-        <div style="font-size:12px;line-height:18px;font-weight:bold;letter-spacing:0.5px;color:#777777;">
-          PLANNED VELOCITY
-        </div>
-        <div style="font-size:27px;line-height:34px;font-weight:bold;color:#222222;margin-top:8px;">
-          ${sprint.plannedVelocity}
-          <span style="font-size:13px;line-height:18px;font-weight:normal;">pts</span>
-        </div>
-      </td>
+<div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#777;margin-bottom:15px;">
+02 / SPRINT VELOCITY
+</div>
 
-      <td width="50%" style="padding:16px;background-color:#111111;border:1px solid #111111;height:100px;vertical-align:top;">
-        <div style="font-size:12px;line-height:18px;font-weight:bold;letter-spacing:0.5px;color:#bbbbbb;">
-          ACTUAL VELOCITY
-        </div>
-        <div style="font-size:27px;line-height:34px;font-weight:bold;color:#ffffff;margin-top:8px;">
-          ${sprint.actualVelocity}
-          <span style="font-size:13px;line-height:18px;font-weight:normal;color:#cccccc;">pts</span>
-        </div>
-        <div style="font-size:11px;line-height:16px;color:#cccccc;margin-top:5px;">
-          ${velocityPercentage}% de la vélocité prévue
-        </div>
-      </td>
-    </tr>
-  </table>
+<table width="100%" cellpadding="0" cellspacing="0"
+style="border-collapse:collapse;table-layout:fixed;">
+
+<tr>
+
+<td width="32%" style="padding:17px 12px;background:#f1f1f1;">
+<div style="font-size:11px;color:#666;font-weight:bold;">OBJECTIF</div>
+
+<div style="font-size:27px;font-weight:bold;color:#111;margin-top:8px;">
+${sprint.plannedVelocity}
+</div>
+
+<div style="font-size:11px;color:#777;">Story points</div>
+</td>
+
+<td width="2%"></td>
+
+<td width="32%" style="padding:17px 12px;background:#111;color:#fff;">
+<div style="font-size:11px;color:#ccc;font-weight:bold;">RÉALISÉ</div>
+
+<div style="font-size:27px;font-weight:bold;color:#fff;margin-top:8px;">
+${sprint.actualVelocity}
+</div>
+
+<div style="font-size:11px;color:#ccc;">Story points</div>
+</td>
+
+<td width="2%"></td>
+
+<td width="32%" style="padding:17px 12px;background:#e5e5e5;">
+<div style="font-size:11px;color:#555;font-weight:bold;">PERFORMANCE</div>
+
+<div style="font-size:27px;font-weight:bold;color:#111;margin-top:8px;">
+${velocityPercentage}%
+</div>
+
+<div style="font-size:11px;color:#777;">De l'objectif</div>
+</td>
+
+</tr>
+</table>
+
+<table width="100%" cellpadding="0" cellspacing="0"
+style="margin-top:15px;background:#e5e5e5;">
+<tr>
+<td width="${progressWidth}%" height="7" style="background:#111;"></td>
+<td></td>
+</tr>
+</table>
+
+<div style="font-size:11px;color:#777;margin-top:7px;">
+${sprint.actualVelocity} points réalisés sur ${sprint.plannedVelocity} points prévus.
+</div>
+
 </td>
 </tr>
 
 <!-- DETAILS -->
+
 <tr>
-<td style="padding:20px 36px 10px;">
+<td style="padding:15px 32px 25px;">
 
-  <div style="font-size:11px;line-height:17px;font-weight:bold;letter-spacing:1.5px;color:#888888;margin-bottom:14px;">
-    SPRINT DETAILS
-  </div>
+<div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#777;margin-bottom:15px;">
+03 / SPRINT DETAILS
+</div>
 
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+<table width="100%" cellpadding="0" cellspacing="0"
+style="border-collapse:collapse;">
 
-    <tr>
-      <td style="padding:12px 0;border-bottom:1px solid #eeeeee;font-size:13px;line-height:19px;color:#555555;">
-        <strong>Tickets au démarrage</strong>
-      </td>
-      <td align="right" style="padding:12px 0;border-bottom:1px solid #eeeeee;font-size:13px;line-height:19px;font-weight:bold;color:#333333;">
-        ${sprint.startTickets} tickets / ${sprint.startPoints} pts
-      </td>
-      <td align="right" style="padding:12px 0;border-bottom:1px solid #eeeeee;font-size:11px;line-height:17px;color:#888888;">
-        ${initialPercentage}%
-      </td>
-    </tr>
+<tr>
+<td style="padding:13px 0;border-bottom:1px solid #e5e5e5;font-size:12px;color:#333;">
+Tickets au démarrage
+</td>
 
-    <tr>
-      <td style="padding:12px 0;border-bottom:1px solid #eeeeee;font-size:13px;line-height:19px;color:#555555;">
-        <strong>Tickets ajoutés pendant le sprint</strong>
-      </td>
-      <td align="right" style="padding:12px 0;border-bottom:1px solid #eeeeee;font-size:13px;line-height:19px;font-weight:bold;color:#333333;">
-        ${sprint.addedTickets} tickets / ${sprint.addedPoints} pts
-      </td>
-      <td align="right" style="padding:12px 0;border-bottom:1px solid #eeeeee;font-size:11px;line-height:17px;color:#888888;">
-        ${addedPercentage}%
-      </td>
-    </tr>
+<td align="right" style="padding:13px 0;border-bottom:1px solid #e5e5e5;font-size:12px;font-weight:bold;color:#111;">
+${sprint.startTickets} tickets · ${sprint.startPoints} pts
+</td>
 
-    <tr>
-      <td style="padding:12px 0;border-bottom:1px solid #eeeeee;font-size:13px;line-height:19px;color:#555555;">
-        <strong>Tickets réestimés</strong>
-      </td>
-      <td align="right" colspan="2" style="padding:12px 0;border-bottom:1px solid #eeeeee;font-size:13px;line-height:19px;font-weight:bold;color:#333333;">
-        ${sprint.reestimatedTickets} tickets / +${sprint.reestimatedPoints} pts
-      </td>
-    </tr>
-
-    <tr>
-      <td style="padding:12px 0;border-bottom:1px solid #eeeeee;font-size:13px;line-height:19px;color:#555555;">
-        <strong>Effort bugs</strong>
-      </td>
-      <td align="right" colspan="2" style="padding:12px 0;border-bottom:1px solid #eeeeee;font-size:13px;line-height:19px;font-weight:bold;color:#333333;">
-        ${sprint.bugPoints} pts (${bugPercentage}% de la vélocité réelle)
-      </td>
-    </tr>
-
-  </table>
+<td align="right" width="55" style="padding:13px 0;border-bottom:1px solid #e5e5e5;font-size:11px;color:#777;">
+${initialPercentage}%
 </td>
 </tr>
 
-<!-- REMAINING TICKETS -->
 <tr>
-<td style="padding:30px 36px 10px;">
+<td style="padding:13px 0;border-bottom:1px solid #e5e5e5;font-size:12px;color:#333;">
+Tickets ajoutés
+</td>
 
-  <div style="font-size:11px;line-height:17px;font-weight:bold;letter-spacing:1.5px;color:#888888;margin-bottom:8px;">
-    REMAINING STORY POINTS
-  </div>
+<td align="right" style="padding:13px 0;border-bottom:1px solid #e5e5e5;font-size:12px;font-weight:bold;color:#111;">
+${sprint.addedTickets} tickets · ${sprint.addedPoints} pts
+</td>
 
-  <div style="font-size:25px;line-height:32px;font-weight:bold;color:#222222;margin-bottom:15px;">
-    ${remainingPoints} pts
-  </div>
-
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-
-    <tr style="background-color:#f5f5f5;">
-      <th align="left" style="padding:11px 12px;font-size:11px;line-height:16px;color:#777777;">TICKET</th>
-      <th align="left" style="padding:11px 12px;font-size:11px;line-height:16px;color:#777777;">DESCRIPTION</th>
-      <th align="right" style="padding:11px 12px;font-size:11px;line-height:16px;color:#777777;">POINTS</th>
-    </tr>
-
-    ${ticketHtml}
-
-  </table>
+<td align="right" width="55" style="padding:13px 0;border-bottom:1px solid #e5e5e5;font-size:11px;color:#777;">
+${addedPercentage}%
 </td>
 </tr>
 
-<!-- LIEN RAPPORT COMPLET -->
-${reportLinkHtml}
-
-<!-- SIGNATURE SANS ENCADRÉ -->
 <tr>
-<td style="padding:30px 36px 36px;background-color:#ffffff;font-size:13px;line-height:22px;color:#555555;">
-  Retrouvez le détail des tickets terminés, non terminés et retirés dans le rapport complet.<br /><br />
+<td style="padding:13px 0;border-bottom:1px solid #e5e5e5;font-size:12px;color:#333;">
+Tickets réestimés
+</td>
 
-  Bon week-end à tous,<br />
-  <strong style="font-size:13px;line-height:22px;color:#222222;">${escapeHtml(sprint.signatories)}</strong>
-  <br /><br />
-  <span style="font-size:11px;line-height:17px;color:#999999;">SPRINT REPORT · ${escapeHtml(sprint.name)}</span>
+<td colspan="2" align="right" style="padding:13px 0;border-bottom:1px solid #e5e5e5;font-size:12px;font-weight:bold;color:#111;">
+${sprint.reestimatedTickets} tickets · +${sprint.reestimatedPoints} pts
+</td>
+</tr>
+
+<tr>
+<td style="padding:13px 0;border-bottom:1px solid #e5e5e5;font-size:12px;color:#333;">
+Effort bugs
+</td>
+
+<td colspan="2" align="right" style="padding:13px 0;border-bottom:1px solid #e5e5e5;font-size:12px;font-weight:bold;color:#111;">
+${sprint.bugPoints} pts · ${bugPercentage}%
 </td>
 </tr>
 
 </table>
+</td>
+</tr>
 
+<!-- TICKETS RESTANTS -->
+
+<tr>
+<td style="padding:15px 32px 30px;">
+
+<table width="100%" cellpadding="0" cellspacing="0"
+style="background:#f1f1f1;margin-bottom:17px;">
+
+<tr>
+<td style="padding:18px 20px;">
+
+<div style="font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#555;">
+04 / REMAINING STORY POINTS
+</div>
+
+<div style="font-size:27px;font-weight:bold;color:#111;margin-top:5px;">
+${remainingPoints} pts
+</div>
+
+<div style="font-size:11px;color:#777;">
+${tickets.length} tickets non terminés
+</div>
+
+</td>
+</tr>
+</table>
+
+<table width="100%" cellpadding="0" cellspacing="0"
+style="border-collapse:collapse;table-layout:fixed;">
+
+<tr style="background:#111;">
+<th width="27%" align="left" style="padding:11px 9px;font-size:11px;color:#fff;">TICKET</th>
+<th width="53%" align="left" style="padding:11px 9px;font-size:11px;color:#fff;">DESCRIPTION</th>
+<th width="20%" align="right" style="padding:11px 9px;font-size:11px;color:#fff;">POINTS</th>
+</tr>
+
+${ticketHtml}
+
+</table>
+</td>
+</tr>
+
+${reportLinkHtml}
+
+<!-- FOOTER -->
+
+<tr>
+<td style="padding:28px 32px;background:#111;color:#fff;">
+
+<div style="font-size:13px;line-height:22px;color:#eee;">
+Bon week-end à tous,
+</div>
+
+<div style="font-size:13px;font-weight:bold;color:#fff;margin-top:5px;">
+${escapeHtml(sprint.signatories)}
+</div>
+
+<div style="font-size:11px;color:#999;margin-top:18px;letter-spacing:1px;">
+SPRINTLY · ${escapeHtml(sprint.name).toUpperCase()}
+</div>
+
+</td>
+</tr>
+
+</table>
 </td>
 </tr>
 </table>
@@ -522,7 +849,11 @@ ${reportLinkHtml}
 </body>
 </html>
 `;
-  };
+};
+
+  // ==========================================
+  // COPIE DU RAPPORT
+  // ==========================================
 
   const copyReport = async () => {
     try {
@@ -531,9 +862,7 @@ ${reportLinkHtml}
       const plainText = `
 Bonjour à tous,
 
-Voici le récapitulatif du ${sprint.name} qui s'est déroulé du ${formatLongDate(
-        sprint.startDate
-      )} au ${formatLongDate(sprint.endDate)}.
+Voici le récapitulatif du ${sprint.name}.
 
 Objectifs :
 ${sprint.objectives}
@@ -547,67 +876,71 @@ ${sprint.signatories}
       `.trim();
 
       const clipboardItem = new ClipboardItem({
-        "text/html": new Blob([html], { type: "text/html" }),
-        "text/plain": new Blob([plainText], { type: "text/plain" }),
+        "text/html": new Blob([html], {
+          type: "text/html",
+        }),
+        "text/plain": new Blob([plainText], {
+          type: "text/plain",
+        }),
       });
 
       await navigator.clipboard.write([clipboardItem]);
 
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
     } catch (error) {
       console.error("Erreur lors de la copie :", error);
+
       alert(
         "La copie HTML n'a pas fonctionné. Essaie de télécharger le rapport."
       );
     }
   };
 
+  // ==========================================
+  // TÉLÉCHARGEMENT HTML
+  // ==========================================
+
   const downloadReport = () => {
     const html = generateReport();
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+
+    const blob = new Blob([html], {
+      type: "text/html;charset=utf-8",
+    });
+
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement("a");
+
     link.href = url;
     link.download = `${sprint.name.replace(/\s+/g, "-")}-report.html`;
+
     link.click();
 
     URL.revokeObjectURL(url);
   };
 
-  const openInEmail = () => {
-    const subject = `Récapitulatif ${sprint.name}`;
-
-    const body = `
-Bonjour à tous,
-
-Voici le récapitulatif du ${sprint.name} qui s'est déroulé du ${formatLongDate(
-      sprint.startDate
-    )} au ${formatLongDate(sprint.endDate)}.
-
-Objectifs :
-${sprint.objectives}
-
-Vélocité prévue : ${sprint.plannedVelocity} points
-Vélocité réelle : ${sprint.actualVelocity} points
-Tickets restants : ${remainingPoints} points
-
-Bon week-end à tous,
-${sprint.signatories}
-    `.trim();
-
-    window.location.href = `mailto:?subject=${encodeURIComponent(
-      subject
-    )}&body=${encodeURIComponent(body)}`;
-  };
+  // ==========================================
+  // INTERFACE
+  // ==========================================
 
   return (
     <div className="app">
+
+      {/* SIDEBAR */}
+
       <aside className="sidebar">
+
         <div className="brand">
           <div className="brand-icon">S</div>
-          <span>Sprintly</span>
+
+          <div className="brand-name">
+            <strong>Sprintly</strong>
+            <span>SPRINT MANAGEMENT</span>
+          </div>
         </div>
 
         <div className="sidebar-label">WORKSPACE</div>
@@ -619,446 +952,848 @@ ${sprint.signatories}
           ◈ &nbsp; Sprint report
         </div>
 
+        <div
+          className={`nav-item ${activeTab === "history" ? "active" : ""}`}
+          onClick={() => setActiveTab("history")}
+        >
+          ◷ &nbsp; Historique des sprints
+        </div>
+
         <div className="sidebar-bottom">
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div className="avatar">M</div>
+
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>Manon</div>
-              <div style={{ fontSize: 11, opacity: 0.6 }}>Workspace</div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                Manon
+              </div>
+
+              <div style={{ fontSize: 11, opacity: 0.6 }}>
+                Workspace
+              </div>
             </div>
           </div>
         </div>
+
       </aside>
 
+      {/* MAIN */}
+
       <main className="main">
+
         <header className="topbar">
+
           <div className="breadcrumb">
-            Workspace / <strong>Sprint report</strong>
+            Workspace / <strong>
+              {activeTab === "history"
+                ? "Historique"
+                : "Sprint report"}
+            </strong>
           </div>
 
           <div className="topbar-actions">
-            <span className="saved-status">● Modifications locales</span>
 
-            <button className="button button-secondary" onClick={downloadReport}>
+            <span className="saved-status">
+              ● Sauvegarde automatique
+            </span>
+
+            <button
+              className="button button-secondary"
+              onClick={downloadReport}
+            >
               Télécharger
             </button>
+
           </div>
+
         </header>
 
         <div className="content">
+
+          {/* PAGE HEADING */}
+
           <div className="page-heading">
-            <div className="eyebrow">SPRINT MANAGEMENT</div>
-            <h1>Rapport de sprint</h1>
+
+            <div className="eyebrow">
+              SPRINT MANAGEMENT
+            </div>
+
+            <h1>
+              {activeTab === "history"
+                ? "Historique des sprints"
+                : "Rapport de sprint"}
+            </h1>
+
             <p style={{ color: "#888888", fontSize: 13 }}>
-              Configure tes données et génère automatiquement ton rapport.
+              {activeTab === "history"
+                ? "Retrouve, consulte ou duplique tes anciens rapports."
+                : "Configure tes données et génère automatiquement ton rapport."}
             </p>
+
           </div>
 
-          <div className="stats-grid">
-            <div className="stat-card">
-              <div className="stat-label">Planned velocity</div>
-              <div className="stat-value">{sprint.plannedVelocity} pts</div>
-              <div className="stat-footer">Objectif du sprint</div>
-            </div>
+          {/* HISTORIQUE */}
 
-            <div className="stat-card">
-              <div className="stat-label">Actual velocity</div>
-              <div className="stat-value">{sprint.actualVelocity} pts</div>
-              <div className="stat-footer positive">
-                {velocityPercentage}% de l'objectif
-              </div>
-            </div>
+          {activeTab === "history" ? (
 
-            <div className="stat-card">
-              <div className="stat-label">Remaining points</div>
-              <div className="stat-value">{remainingPoints} pts</div>
-              <div className="stat-footer">Tickets non terminés</div>
-            </div>
+            <section className="history-panel">
 
-            <div className="stat-card">
-              <div className="stat-label">Bug effort</div>
-              <div className="stat-value">{sprint.bugPoints} pts</div>
-              <div className="stat-footer">
-                {bugPercentage}% de la vélocité réelle
-              </div>
-            </div>
-          </div>
+              <div className="history-header">
 
-          <div className="workspace">
-            {/* FORMULAIRE */}
-            <section className="form-panel">
-              <div className="panel-header">
-                <h2>Configuration du rapport</h2>
-                <span className="step-badge">Édition</span>
+                <div>
+                  <h2>Historique des sprints</h2>
+
+                  <p>
+                    {history.length} sprint(s) enregistré(s)
+                  </p>
+                </div>
+
+                <button
+                  className="button button-primary"
+                  onClick={() => setActiveTab("general")}
+                >
+                  Retour au rapport
+                </button>
+
               </div>
 
-              <div className="form-section">
-                <div className="section-heading">
-                  01 — Informations générales
+              {history.length === 0 ? (
+
+                <div className="history-empty">
+                  Aucun sprint enregistré pour le moment.
+                  Ouvre un rapport et clique sur
+                  « Enregistrer ce sprint ».
                 </div>
 
-                <div className="field">
-                  <label>Nom du sprint</label>
-                  <input
-                    value={sprint.name}
-                    onChange={(e) => updateSprint("name", e.target.value)}
-                  />
+              ) : (
+
+                <div className="history-list">
+
+                  {history.map((item) => (
+
+                    <div className="history-item" key={item.id}>
+
+                      <div className="history-info">
+
+                        <strong>
+                          {item.sprint.name}
+                        </strong>
+
+                        <span>
+                          {formatDate(item.sprint.startDate)}
+                          {" — "}
+                          {formatDate(item.sprint.endDate)}
+                        </span>
+
+                        <small>
+                          Enregistré le{" "}
+                          {new Date(item.savedAt).toLocaleDateString("fr-FR")}
+                        </small>
+
+                      </div>
+
+                      <div className="history-stats">
+
+                        <strong>
+                          {item.sprint.actualVelocity} pts
+                        </strong>
+
+                        <span>
+                          Vélocité réelle
+                        </span>
+
+                      </div>
+
+                      <div className="history-actions">
+
+                        <button
+                          className="button button-secondary"
+                          onClick={() => loadSprintFromHistory(item)}
+                        >
+                          Ouvrir
+                        </button>
+
+                        <button
+                          className="button button-secondary"
+                          onClick={() => duplicateSprintFromHistory(item)}
+                        >
+                          Dupliquer
+                        </button>
+
+                        <button
+                          className="remove-button"
+                          onClick={() => deleteSprintFromHistory(item.id)}
+                        >
+                          Supprimer
+                        </button>
+
+                      </div>
+
+                    </div>
+
+                  ))}
+
                 </div>
 
-                <div className="field-row">
-                  <div className="field">
-                    <label>Date de début</label>
-                    <input
-                      type="date"
-                      value={sprint.startDate}
-                      onChange={(e) =>
-                        updateSprint("startDate", e.target.value)
-                      }
+              )}
+
+            </section>
+
+          ) : (
+
+            <>
+
+              {/* KPI */}
+
+              <div className="stats-grid">
+
+                <div className="stat-card">
+
+                  <div className="stat-top">
+                    <div className="stat-label">
+                      Planned velocity
+                    </div>
+
+                    <div className="kpi-icon purple">
+                      ◎
+                    </div>
+                  </div>
+
+                  <div className="stat-value">
+                    {sprint.plannedVelocity} <span>pts</span>
+                  </div>
+
+                  <div className="stat-footer">
+                    Objectif du sprint
+                  </div>
+
+                </div>
+
+                <div className="stat-card">
+
+                  <div className="stat-top">
+                    <div className="stat-label">
+                      Actual velocity
+                    </div>
+
+                    <div className="kpi-icon green">
+                      ↗
+                    </div>
+                  </div>
+
+                  <div className="stat-value">
+                    {sprint.actualVelocity} <span>pts</span>
+                  </div>
+
+                  <div className="stat-footer positive">
+                    {velocityPercentage >= 100 ? "+" : ""}
+                    {velocityPercentage - 100}% de l'objectif
+                  </div>
+
+                  <div className="velocity-progress">
+                    <div
+                      className="velocity-progress-fill complete"
+                      style={{
+                        width: `${Math.min(velocityPercentage, 100)}%`,
+                      }}
                     />
                   </div>
 
-                  <div className="field">
-                    <label>Date de fin</label>
-                    <input
-                      type="date"
-                      value={sprint.endDate}
-                      onChange={(e) => updateSprint("endDate", e.target.value)}
-                    />
-                  </div>
                 </div>
 
-                <div className="field">
-                  <label>Objectifs du sprint</label>
-                  <textarea
-                    value={sprint.objectives}
-                    onChange={(e) => updateSprint("objectives", e.target.value)}
-                    placeholder="Un objectif par ligne"
-                  />
+                <div className="stat-card">
+
+                  <div className="stat-top">
+                    <div className="stat-label">
+                      Remaining points
+                    </div>
+
+                    <div className="kpi-icon orange">
+                      ◷
+                    </div>
+                  </div>
+
+                  <div className="stat-value">
+                    {remainingPoints} <span>pts</span>
+                  </div>
+
+                  <div className="stat-footer">
+                    Tickets non terminés
+                  </div>
+
                 </div>
+
+                <div className="stat-card">
+
+                  <div className="stat-top">
+                    <div className="stat-label">
+                      Bug effort
+                    </div>
+
+                    <div className="kpi-icon red">
+                      ⚑
+                    </div>
+                  </div>
+
+                  <div className="stat-value">
+                    {sprint.bugPoints} <span>pts</span>
+                  </div>
+
+                  <div className="stat-footer">
+                    {bugPercentage}% de la vélocité réelle
+                  </div>
+
+                </div>
+
               </div>
 
-              <div className="form-section">
-                <div className="section-heading">
-                  02 — Indicateurs de vélocité
-                </div>
+              {/* WORKSPACE */}
 
-                <div className="field-row">
-                  <div className="field">
-                    <label>Vélocité prévue (points)</label>
-                    <input
-                      type="number"
-                      value={sprint.plannedVelocity}
-                      onChange={(e) =>
-                        updateSprint("plannedVelocity", Number(e.target.value))
-                      }
-                    />
+              <div className="workspace">
+
+                {/* FORMULAIRE */}
+
+                <section className="form-panel">
+
+                  <div className="panel-header">
+                    <h2>Configuration du rapport</h2>
+                    <span className="step-badge">Édition</span>
                   </div>
 
-                  <div className="field">
-                    <label>Vélocité réelle (points)</label>
-                    <input
-                      type="number"
-                      value={sprint.actualVelocity}
-                      onChange={(e) =>
-                        updateSprint("actualVelocity", Number(e.target.value))
-                      }
-                    />
-                  </div>
-                </div>
+                  {/* INFORMATIONS GÉNÉRALES */}
 
-                <div className="field-row">
-                  <div className="field">
-                    <label>Tickets au démarrage</label>
-                    <input
-                      type="number"
-                      value={sprint.startTickets}
-                      onChange={(e) =>
-                        updateSprint("startTickets", Number(e.target.value))
-                      }
-                    />
-                  </div>
+                  <div className="form-section">
 
-                  <div className="field">
-                    <label>Points au démarrage</label>
-                    <input
-                      type="number"
-                      value={sprint.startPoints}
-                      onChange={(e) =>
-                        updateSprint("startPoints", Number(e.target.value))
-                      }
-                    />
-                  </div>
-                </div>
+                    <div className="section-heading">
+                      01 — Informations générales
+                    </div>
 
-                <div className="field-row">
-                  <div className="field">
-                    <label>Tickets ajoutés</label>
-                    <input
-                      type="number"
-                      value={sprint.addedTickets}
-                      onChange={(e) =>
-                        updateSprint("addedTickets", Number(e.target.value))
-                      }
-                    />
-                  </div>
+                    <div className="field">
+                      <label>Nom du sprint</label>
 
-                  <div className="field">
-                    <label>Points ajoutés</label>
-                    <input
-                      type="number"
-                      value={sprint.addedPoints}
-                      onChange={(e) =>
-                        updateSprint("addedPoints", Number(e.target.value))
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="field-row">
-                  <div className="field">
-                    <label>Tickets réestimés</label>
-                    <input
-                      type="number"
-                      value={sprint.reestimatedTickets}
-                      onChange={(e) =>
-                        updateSprint(
-                          "reestimatedTickets",
-                          Number(e.target.value)
-                        )
-                      }
-                    />
-                  </div>
-
-                  <div className="field">
-                    <label>Points réestimés</label>
-                    <input
-                      type="number"
-                      value={sprint.reestimatedPoints}
-                      onChange={(e) =>
-                        updateSprint(
-                          "reestimatedPoints",
-                          Number(e.target.value)
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="field">
-                  <label>Effort bugs (points)</label>
-                  <input
-                    type="number"
-                    value={sprint.bugPoints}
-                    onChange={(e) =>
-                      updateSprint("bugPoints", Number(e.target.value))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="form-section">
-                <div className="section-heading">03 — Releases</div>
-
-                {releases.map((release, index) => (
-                  <div className="dynamic-card" key={index}>
-                    <div className="dynamic-card-header">
-                      <strong>Release {index + 1}</strong>
-                      <button
-                        className="remove-button"
-                        onClick={() => removeRelease(index)}
-                      >
-                        Supprimer
-                      </button>
+                      <input
+                        value={sprint.name}
+                        onChange={(e) =>
+                          updateSprint("name", e.target.value)
+                        }
+                      />
                     </div>
 
                     <div className="field-row">
-                      <div className="field">
-                        <label>Version</label>
-                        <input
-                          value={release.version}
-                          onChange={(e) =>
-                            updateRelease(index, "version", e.target.value)
-                          }
-                        />
-                      </div>
 
                       <div className="field">
-                        <label>Date</label>
+                        <label>Date de début</label>
+
                         <input
                           type="date"
-                          value={release.date}
+                          value={sprint.startDate}
                           onChange={(e) =>
-                            updateRelease(index, "date", e.target.value)
+                            updateSprint("startDate", e.target.value)
                           }
                         />
                       </div>
+
+                      <div className="field">
+                        <label>Date de fin</label>
+
+                        <input
+                          type="date"
+                          value={sprint.endDate}
+                          onChange={(e) =>
+                            updateSprint("endDate", e.target.value)
+                          }
+                        />
+                      </div>
+
                     </div>
 
                     <div className="field">
-                      <label>Application</label>
-                      <input
-                        value={release.name}
+                      <label>Objectifs du sprint</label>
+
+                      <textarea
+                        value={sprint.objectives}
                         onChange={(e) =>
-                          updateRelease(index, "name", e.target.value)
+                          updateSprint("objectives", e.target.value)
+                        }
+                        placeholder="Un objectif par ligne"
+                      />
+                    </div>
+
+                  </div>
+
+                  {/* VELOCITY */}
+
+                  <div className="form-section">
+
+                    <div className="section-heading">
+                      02 — Indicateurs de vélocité
+                    </div>
+
+                    <div className="field-row">
+
+                      <div className="field">
+                        <label>Vélocité prévue (points)</label>
+
+                        <input
+                          type="number"
+                          value={sprint.plannedVelocity}
+                          onChange={(e) =>
+                            updateSprint(
+                              "plannedVelocity",
+                              Number(e.target.value)
+                            )
+                          }
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label>Vélocité réelle (points)</label>
+
+                        <input
+                          type="number"
+                          value={sprint.actualVelocity}
+                          onChange={(e) =>
+                            updateSprint(
+                              "actualVelocity",
+                              Number(e.target.value)
+                            )
+                          }
+                        />
+                      </div>
+
+                    </div>
+
+                    <div className="field-row">
+
+                      <div className="field">
+                        <label>Tickets au démarrage</label>
+
+                        <input
+                          type="number"
+                          value={sprint.startTickets}
+                          onChange={(e) =>
+                            updateSprint(
+                              "startTickets",
+                              Number(e.target.value)
+                            )
+                          }
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label>Points au démarrage</label>
+
+                        <input
+                          type="number"
+                          value={sprint.startPoints}
+                          onChange={(e) =>
+                            updateSprint(
+                              "startPoints",
+                              Number(e.target.value)
+                            )
+                          }
+                        />
+                      </div>
+
+                    </div>
+
+                    <div className="field-row">
+
+                      <div className="field">
+                        <label>Tickets ajoutés</label>
+
+                        <input
+                          type="number"
+                          value={sprint.addedTickets}
+                          onChange={(e) =>
+                            updateSprint(
+                              "addedTickets",
+                              Number(e.target.value)
+                            )
+                          }
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label>Points ajoutés</label>
+
+                        <input
+                          type="number"
+                          value={sprint.addedPoints}
+                          onChange={(e) =>
+                            updateSprint(
+                              "addedPoints",
+                              Number(e.target.value)
+                            )
+                          }
+                        />
+                      </div>
+
+                    </div>
+
+                    <div className="field-row">
+
+                      <div className="field">
+                        <label>Tickets réestimés</label>
+
+                        <input
+                          type="number"
+                          value={sprint.reestimatedTickets}
+                          onChange={(e) =>
+                            updateSprint(
+                              "reestimatedTickets",
+                              Number(e.target.value)
+                            )
+                          }
+                        />
+                      </div>
+
+                      <div className="field">
+                        <label>Points réestimés</label>
+
+                        <input
+                          type="number"
+                          value={sprint.reestimatedPoints}
+                          onChange={(e) =>
+                            updateSprint(
+                              "reestimatedPoints",
+                              Number(e.target.value)
+                            )
+                          }
+                        />
+                      </div>
+
+                    </div>
+
+                    <div className="field">
+                      <label>Effort bugs (points)</label>
+
+                      <input
+                        type="number"
+                        value={sprint.bugPoints}
+                        onChange={(e) =>
+                          updateSprint(
+                            "bugPoints",
+                            Number(e.target.value)
+                          )
                         }
                       />
                     </div>
 
-                    <div className="field">
-                      <label>Description de la release</label>
-                      <input
-                        value={release.description}
-                        onChange={(e) =>
-                          updateRelease(index, "description", e.target.value)
-                        }
-                      />
+                  </div>
+
+                  {/* RELEASES */}
+
+                  <div className="form-section">
+
+                    <div className="section-heading">
+                      03 — Releases
+                    </div>
+
+                    {releases.map((release, index) => (
+
+                      <div className="dynamic-card" key={index}>
+
+                        <div className="dynamic-card-header">
+                          <strong>Release {index + 1}</strong>
+
+                          <button
+                            className="remove-button"
+                            onClick={() => removeRelease(index)}
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+
+                        <div className="field-row">
+
+                          <div className="field">
+                            <label>Version</label>
+
+                            <input
+                              value={release.version}
+                              onChange={(e) =>
+                                updateRelease(
+                                  index,
+                                  "version",
+                                  e.target.value
+                                )
+                              }
+                            />
+                          </div>
+
+                          <div className="field">
+                            <label>Date</label>
+
+                            <input
+                              type="date"
+                              value={release.date}
+                              onChange={(e) =>
+                                updateRelease(
+                                  index,
+                                  "date",
+                                  e.target.value
+                                )
+                              }
+                            />
+                          </div>
+
+                        </div>
+
+                        <div className="field">
+                          <label>Application</label>
+
+                          <input
+                            value={release.name}
+                            onChange={(e) =>
+                              updateRelease(
+                                index,
+                                "name",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </div>
+
+                        <div className="field">
+                          <label>Description de la release</label>
+
+                          <input
+                            value={release.description}
+                            onChange={(e) =>
+                              updateRelease(
+                                index,
+                                "description",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </div>
+
+                        <div className="field">
+                          <label>Lien Jira</label>
+
+                          <input
+                            value={release.link}
+                            onChange={(e) =>
+                              updateRelease(
+                                index,
+                                "link",
+                                e.target.value
+                              )
+                            }
+                            placeholder="https://..."
+                          />
+                        </div>
+
+                      </div>
+
+                    ))}
+
+                    <button
+                      className="button button-secondary"
+                      onClick={addRelease}
+                    >
+                      + Ajouter une release
+                    </button>
+
+                  </div>
+
+                  {/* TICKETS */}
+
+                  <div className="form-section">
+
+                    <div className="section-heading">
+                      04 — Tickets restants
+                    </div>
+
+                    {tickets.map((ticket, index) => (
+
+                      <div className="dynamic-card" key={index}>
+
+                        <div className="dynamic-card-header">
+                          <strong>Ticket {index + 1}</strong>
+
+                          <button
+                            className="remove-button"
+                            onClick={() => removeTicket(index)}
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+
+                        <div className="field">
+                          <label>Clé Jira</label>
+
+                          <input
+                            value={ticket.key}
+                            onChange={(e) =>
+                              updateTicket(
+                                index,
+                                "key",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </div>
+
+                        <div className="field">
+                          <label>Description</label>
+
+                          <input
+                            value={ticket.title}
+                            onChange={(e) =>
+                              updateTicket(
+                                index,
+                                "title",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </div>
+
+                        <div className="field">
+                          <label>Story points</label>
+
+                          <input
+                            type="number"
+                            value={ticket.points}
+                            onChange={(e) =>
+                              updateTicket(
+                                index,
+                                "points",
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </div>
+
+                      </div>
+
+                    ))}
+
+                    <button
+                      className="button button-secondary"
+                      onClick={addTicket}
+                    >
+                      + Ajouter un ticket
+                    </button>
+
+                  </div>
+
+                  {/* FINALISATION */}
+
+                  <div className="form-section">
+
+                    <div className="section-heading">
+                      05 — Finalisation
                     </div>
 
                     <div className="field">
-                      <label>Lien Jira</label>
+                      <label>Lien vers le rapport complet</label>
+
                       <input
-                        value={release.link}
+                        value={sprint.reportLink}
                         onChange={(e) =>
-                          updateRelease(index, "link", e.target.value)
+                          updateSprint("reportLink", e.target.value)
                         }
                         placeholder="https://..."
                       />
                     </div>
+
+                    <div className="field">
+                      <label>Signataires</label>
+
+                      <input
+                        value={sprint.signatories}
+                        onChange={(e) =>
+                          updateSprint("signatories", e.target.value)
+                        }
+                      />
+                    </div>
+
                   </div>
-                ))}
 
-                <button className="button button-secondary" onClick={addRelease}>
-                  + Ajouter une release
-                </button>
-              </div>
+                </section>
 
-              <div className="form-section">
-                <div className="section-heading">04 — Tickets restants</div>
+                {/* APERÇU */}
 
-                {tickets.map((ticket, index) => (
-                  <div className="dynamic-card" key={index}>
-                    <div className="dynamic-card-header">
-                      <strong>Ticket {index + 1}</strong>
-                      <button
-                        className="remove-button"
-                        onClick={() => removeTicket(index)}
-                      >
-                        Supprimer
-                      </button>
-                    </div>
+                <section className="preview-panel">
 
-                    <div className="field">
-                      <label>Clé Jira</label>
-                      <input
-                        value={ticket.key}
-                        onChange={(e) =>
-                          updateTicket(index, "key", e.target.value)
-                        }
-                      />
-                    </div>
-
-                    <div className="field">
-                      <label>Description</label>
-                      <input
-                        value={ticket.title}
-                        onChange={(e) =>
-                          updateTicket(index, "title", e.target.value)
-                        }
-                      />
-                    </div>
-
-                    <div className="field">
-                      <label>Story points</label>
-                      <input
-                        type="number"
-                        value={ticket.points}
-                        onChange={(e) =>
-                          updateTicket(index, "points", Number(e.target.value))
-                        }
-                      />
-                    </div>
+                  <div className="panel-header">
+                    <h2>Aperçu du rapport</h2>
+                    <span className="step-badge">Live preview</span>
                   </div>
-                ))}
 
-                <button className="button button-secondary" onClick={addTicket}>
-                  + Ajouter un ticket
-                </button>
+                  <div className="email-preview">
+
+                    <div className="email-toolbar">
+                      <span className="email-dot red"></span>
+                      <span className="email-dot yellow"></span>
+                      <span className="email-dot green"></span>
+
+                      <span className="email-toolbar-label">
+                        Email preview — {sprint.name}
+                      </span>
+                    </div>
+
+                    <div className="email-body">
+                      <div
+                        className="html-email-preview"
+                        dangerouslySetInnerHTML={{
+                          __html: generateReport(),
+                        }}
+                      />
+                    </div>
+
+                  </div>
+
+                  <div className="preview-actions">
+
+                    <button
+                      className="button button-primary"
+                      onClick={copyReport}
+                    >
+                      {copied
+                        ? "✓ Rapport copié !"
+                        : "Copier le rapport"}
+                    </button>
+
+                    <button
+                      className="button button-secondary"
+                      onClick={downloadReport}
+                    >
+                      Télécharger HTML
+                    </button>
+
+                  </div>
+
+                  <div className="helper-card">
+                    <strong>Astuce</strong>
+
+                    <p>
+                      Copie le rapport puis colle-le directement dans
+                      Outlook ou Gmail pour conserver sa mise en forme.
+                      Le rendu peut varier légèrement selon la messagerie.
+                    </p>
+                  </div>
+
+                </section>
+
               </div>
 
-              <div className="form-section">
-                <div className="section-heading">05 — Finalisation</div>
+            </>
 
-                <div className="field">
-                  <label>Lien vers le rapport complet</label>
-                  <input
-                    value={sprint.reportLink}
-                    onChange={(e) => updateSprint("reportLink", e.target.value)}
-                    placeholder="https://..."
-                  />
-                </div>
+          )}
 
-                <div className="field">
-                  <label>Signataires</label>
-                  <input
-                    value={sprint.signatories}
-                    onChange={(e) => updateSprint("signatories", e.target.value)}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* APERÇU */}
-            <section className="preview-panel">
-              <div className="panel-header">
-                <h2>Aperçu du rapport</h2>
-                <span className="step-badge">Live preview</span>
-              </div>
-
-              <div className="email-preview">
-                <div className="email-toolbar">
-                  <span className="email-dot red"></span>
-                  <span className="email-dot yellow"></span>
-                  <span className="email-dot green"></span>
-                  <span className="email-toolbar-label">
-                    Email preview — {sprint.name}
-                  </span>
-                </div>
-
-                <div className="email-body">
-                  <div
-                    className="html-email-preview"
-                    dangerouslySetInnerHTML={{ __html: generateReport() }}
-                  />
-                </div>
-              </div>
-
-              <div className="preview-actions">
-                <button className="button button-primary" onClick={copyReport}>
-                  {copied ? "✓ Rapport copié !" : "Copier le rapport"}
-                </button>
-
-                <button
-                  className="button button-secondary"
-                  onClick={downloadReport}
-                >
-                  Télécharger HTML
-                </button>
-              </div>
-
-              <div className="helper-card">
-                <strong>Astuce</strong>
-                <p>
-                  Copie le rapport puis colle-le directement dans Outlook ou
-                  Gmail pour conserver sa mise en forme. Le rendu peut varier
-                  légèrement selon la messagerie.
-                </p>
-              </div>
-            </section>
+          <div className="footer">
+            Sprintly — Sprint report generator
           </div>
 
-          <div className="footer">Sprintly — Sprint report generator</div>
         </div>
+
       </main>
+
     </div>
   );
 }
