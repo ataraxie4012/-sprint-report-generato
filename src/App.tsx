@@ -434,7 +434,6 @@ function App() {
 <tr><td style="background:#111;padding:36px 32px;">
 <div style="font-size:11px;letter-spacing:3px;color:#aaa;margin-bottom:18px;">RAPPORT DE SPRINT</div>
 <div style="font-size:30px;line-height:38px;font-weight:bold;color:#fff;">${escapeHtml(sprint.name)}</div>
-<div style="font-size:12px;color:#ccc;margin-top:12px;">${escapeHtml(formatDate(sprint.startDate))} &nbsp; — &nbsp; ${escapeHtml(formatDate(sprint.endDate))}</div>
 </td></tr>
 
 <tr><td style="padding:30px 32px;font-size:13px;line-height:23px;color:#444;">
