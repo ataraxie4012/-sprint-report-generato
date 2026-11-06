@@ -658,13 +658,15 @@ ${sprint.signatories}
 
           <div className="topbar-actions">
             <span className="saved-status">● Sauvegarde automatique</span>
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={downloadReport}
-            >
-              Télécharger
-            </button>
+            {activeTab === "general" && (
+              <button
+                type="button"
+                className="button button-primary"
+                onClick={saveSprintToHistory}
+              >
+                Enregistrer le rapport
+              </button>
+            )}
           </div>
         </header>
 
@@ -1153,7 +1155,8 @@ ${sprint.signatories}
                         <label>Vélocité prévue (points)</label>
                         <input
                           type="number"
-                          value={sprint.plannedVelocity}
+                          value={sprint.plannedVelocity || ""}
+                          placeholder="0"
                           onChange={(e) =>
                             updateSprint(
                               "plannedVelocity",
@@ -1166,7 +1169,8 @@ ${sprint.signatories}
                         <label>Vélocité réelle (points)</label>
                         <input
                           type="number"
-                          value={sprint.actualVelocity}
+                          value={sprint.actualVelocity || ""}
+                          placeholder="0"
                           onChange={(e) =>
                             updateSprint(
                               "actualVelocity",
@@ -1182,7 +1186,8 @@ ${sprint.signatories}
                         <label>Tickets au démarrage</label>
                         <input
                           type="number"
-                          value={sprint.startTickets}
+                          value={sprint.startTickets || ""}
+                          placeholder="0"
                           onChange={(e) =>
                             updateSprint("startTickets", Number(e.target.value))
                           }
@@ -1192,7 +1197,8 @@ ${sprint.signatories}
                         <label>Points au démarrage</label>
                         <input
                           type="number"
-                          value={sprint.startPoints}
+                          value={sprint.startPoints || ""}
+                          placeholder="0"
                           onChange={(e) =>
                             updateSprint("startPoints", Number(e.target.value))
                           }
@@ -1205,7 +1211,8 @@ ${sprint.signatories}
                         <label>Tickets ajoutés</label>
                         <input
                           type="number"
-                          value={sprint.addedTickets}
+                          value={sprint.addedTickets || ""}
+                          placeholder="0"
                           onChange={(e) =>
                             updateSprint("addedTickets", Number(e.target.value))
                           }
@@ -1215,7 +1222,8 @@ ${sprint.signatories}
                         <label>Points ajoutés</label>
                         <input
                           type="number"
-                          value={sprint.addedPoints}
+                          value={sprint.addedPoints || ""}
+                          placeholder="0"
                           onChange={(e) =>
                             updateSprint("addedPoints", Number(e.target.value))
                           }
@@ -1228,7 +1236,8 @@ ${sprint.signatories}
                         <label>Tickets réestimés</label>
                         <input
                           type="number"
-                          value={sprint.reestimatedTickets}
+                          value={sprint.reestimatedTickets || ""}
+                          placeholder="0"
                           onChange={(e) =>
                             updateSprint(
                               "reestimatedTickets",
@@ -1241,7 +1250,8 @@ ${sprint.signatories}
                         <label>Points réestimés</label>
                         <input
                           type="number"
-                          value={sprint.reestimatedPoints}
+                          value={sprint.reestimatedPoints || ""}
+                          placeholder="0"
                           onChange={(e) =>
                             updateSprint(
                               "reestimatedPoints",
@@ -1256,7 +1266,8 @@ ${sprint.signatories}
                       <label>Effort bugs (points)</label>
                       <input
                         type="number"
-                        value={sprint.bugPoints}
+                        value={sprint.bugPoints || ""}
+                          placeholder="0"
                         onChange={(e) =>
                           updateSprint("bugPoints", Number(e.target.value))
                         }
@@ -1392,7 +1403,8 @@ ${sprint.signatories}
                           <label>Points d'effort</label>
                           <input
                             type="number"
-                            value={ticket.points}
+                            value={ticket.points || ""}
+                            placeholder="0"
                             onChange={(e) =>
                               updateTicket(index, "points", Number(e.target.value))
                             }
@@ -1479,13 +1491,6 @@ ${sprint.signatories}
                       Télécharger le HTML
                     </button>
 
-                    <button
-                      type="button"
-                      className="button button-secondary"
-                      onClick={saveSprintToHistory}
-                    >
-                      Enregistrer ce sprint
-                    </button>
                   </div>
 
                   <div className="helper-card">
