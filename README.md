@@ -57,3 +57,55 @@ L'application transforme les données saisies en un rapport synthétique, prêt 
 
 ```bash
 git clone https://github.com/TON-UTILISATEUR/sprintly.git
+
+
+# Démarrer Sprintly en local
+
+Ce guide explique comment cloner, installer et lancer le projet Sprintly sur macOS, depuis un terminal ou VS Code.
+
+Dépôt GitHub : https://github.com/ataraxie4012/-sprint-report-generato
+
+## 1. Prérequis
+
+Installer Git et Node.js (avec npm). Vérifier leur disponibilité :
+
+```bash
+git --version
+node -v
+npm -v
+```
+
+Pour une version récente de Vite, utiliser une version de Node.js compatible (par exemple Node.js 22.12+).
+
+## 2. Cloner le dépôt
+
+```bash
+git clone https://github.com/ataraxie4012/-sprint-report-generato.git
+cd ./-sprint-report-generato
+```
+
+## 3. Ouvrir dans VS Code (facultatif)
+
+```bash
+code .
+```
+
+Si `code` n'est pas reconnu, ouvrir le dossier depuis l'interface de VS Code.
+
+## 4. Installer les dépendances
+
+Si le dépôt contient `package-lock.json`, utiliser npm :
+
+```bash
+npm install
+```
+
+## 6. Lancer le serveur de développement
+
+```bash
+npm run dev
+```
+
+Ouvrir l'URL affichée dans le terminal, généralement **http://localhost:5173/** avec Vite.
+
+Pour arrêter le serveur, appuyer sur **Ctrl + C**.
