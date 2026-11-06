@@ -1,75 +1,59 @@
-# React + TypeScript + Vite
+# 🚀 Sprintly
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Sprintly** est une application web permettant de générer rapidement des comptes rendus de sprint clairs, structurés et professionnels.
 
-Currently, two official plugins are available:
+L'objectif est de simplifier le suivi des sprints Agile en centralisant les informations essentielles : objectifs, vélocité, tickets, releases et bilan du sprint.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+L'application transforme les données saisies en un rapport synthétique, prêt à être partagé par e-mail.
 
-## React Compiler
+## ✨ Fonctionnalités
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 📋 Gestion du sprint
+- Nom et numéro du sprint.
+- Dates de début et de fin.
+- Définition des objectifs du sprint.
 
-## Expanding the ESLint configuration
+### 📊 Suivi de la vélocité
+- Vélocité prévisionnelle.
+- Vélocité réellement réalisée.
+- Calcul automatique du taux de réalisation.
+- Comparaison entre prévisionnel et réalisé.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 🎫 Suivi des tickets
+- Ajout des tickets Jira.
+- Référence et description des tickets.
+- Estimation en points.
+- Suivi des tickets ajoutés en cours de sprint.
+- Suivi des réestimations.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 📦 Suivi des releases
+- Gestion des versions applicatives.
+- Dates de livraison.
+- Nom et description des releases.
+- Ajout de liens associés aux versions.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### 📄 Génération du rapport
+- Génération automatique du compte rendu.
+- Présentation synthétique des données du sprint.
+- Mise en forme professionnelle.
+- Rapport prêt à être copié dans un e-mail.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🛠️ Technologies utilisées
 
-```
+| Technologie | Utilisation |
+|---|---|
+| React | Construction de l'interface |
+| TypeScript | Typage et fiabilité du code |
+| Vite | Environnement de développement |
+| CSS | Mise en forme et design |
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+## 💻 Installation
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Prérequis
+- Node.js
+- npm
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 1. Cloner le projet
 
-```
+```bash
+git clone https://github.com/TON-UTILISATEUR/sprintly.git
