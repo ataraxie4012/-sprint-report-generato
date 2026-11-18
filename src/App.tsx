@@ -1,4 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type {
+  Dispatch,
+  KeyboardEvent,
+  PointerEvent,
+  ReactNode,
+  SetStateAction,
+} from "react";
 import "./App.css";
 
 // ==========================================
@@ -17,6 +24,22 @@ type Ticket = {
   key: string;
   title: string;
   points: number;
+};
+
+type EditableItem<T> = T & { editorId: string };
+type CardKind = "release" | "ticket";
+type CardMove = { kind: CardKind; id: string };
+
+type CardDrop = { id: string; before: boolean };
+
+type CardDrag = {
+  id: string;
+  pointerId: number;
+  startY: number;
+  x: number;
+  y: number;
+  frame: number | null;
+  target: CardDrop | null;
 };
 
 type Sprint = {
@@ -133,6 +156,15 @@ const loadSprintHistory = (): SprintHistoryItem[] => {
   }
 };
 
+const formatPoints = new Intl.NumberFormat("fr-FR", {
+  maximumFractionDigits: 3,
+});
+
+const formatPointDifference = new Intl.NumberFormat("fr-FR", {
+  maximumFractionDigits: 3,
+  signDisplay: "exceptZero",
+});
+
 const formatDate = (date: string) => {
   if (!date) return "";
   const parsedDate = new Date(`${date}T12:00:00`);
@@ -167,6 +199,239 @@ const makeId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
+const toEditableItems = <T,>(items: T[]): EditableItem<T>[] =>
+  items.map((item) => ({ ...item, editorId: makeId() }));
+
+const toSavedItems = <T extends { editorId: string },>(items: T[]) =>
+  items.map(({ editorId: _editorId, ...item }) => item);
+
+type ReorderableCardsProps<T extends { editorId: string }> = {
+  kind: CardKind;
+  items: T[];
+  setItems: Dispatch<SetStateAction<T[]>>;
+  onMove: (move: CardMove) => void;
+  onRemove: (id: string) => void;
+  children: (item: T) => ReactNode;
+};
+
+function ReorderableCards<T extends { editorId: string }>({
+  kind,
+  items,
+  setItems,
+  onMove,
+  onRemove,
+  children,
+}: ReorderableCardsProps<T>) {
+  const listRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef<CardDrag | null>(null);
+  const [dropPreview, setDropPreview] = useState<{
+    draggedId: string;
+    target: CardDrop | null;
+  } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      const frame = dragState.current?.frame;
+      if (frame != null) window.cancelAnimationFrame(frame);
+      dragState.current = null;
+    };
+  }, []);
+
+  const moveCard = (id: string, target: CardDrop) => {
+    if (id === target.id) return;
+    const sourceIndex = items.findIndex(({ editorId }) => editorId === id);
+    const targetIndex = items.findIndex(({ editorId }) => editorId === target.id);
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const insertionIndex =
+      targetIndex + (target.before ? 0 : 1) - (sourceIndex < targetIndex ? 1 : 0);
+    if (sourceIndex === insertionIndex) return;
+
+    setItems((previous) => {
+      const item = previous.find(({ editorId }) => editorId === id);
+      const next = previous.filter(({ editorId }) => editorId !== id);
+      const targetIndex = next.findIndex(
+        ({ editorId }) => editorId === target.id
+      );
+      if (!item || targetIndex === -1) return previous;
+
+      next.splice(targetIndex + (target.before ? 0 : 1), 0, item);
+      return next;
+    });
+    onMove({ kind, id });
+  };
+
+  const findCardDrop = (
+    list: HTMLDivElement,
+    { id, x, y }: Pick<CardDrag, "id" | "x" | "y">
+  ) => {
+    const bounds = list.getBoundingClientRect();
+    if (x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) {
+      return null;
+    }
+
+    let lastId: string | undefined;
+    for (const card of list.querySelectorAll<HTMLElement>("[data-reorder-id]")) {
+      const cardId = card.dataset.reorderId;
+      if (!cardId || cardId === id) continue;
+      const { top, height } = card.getBoundingClientRect();
+      if (y < top + height / 2) {
+        return { id: cardId, before: true };
+      }
+      lastId = cardId;
+    }
+    return lastId ? { id: lastId, before: false } : null;
+  };
+
+  const updateCardDrag = () => {
+    const drag = dragState.current;
+    const list = listRef.current;
+    if (!drag || !list) return;
+
+    const bounds = list.getBoundingClientRect();
+    if (drag.x >= bounds.left && drag.x <= bounds.right) {
+      const edge = 64;
+      if (drag.y < edge && bounds.top < 0) window.scrollBy(0, -12);
+      if (drag.y > window.innerHeight - edge && bounds.bottom > window.innerHeight) {
+        window.scrollBy(0, 12);
+      }
+    }
+
+    const target = findCardDrop(list, drag);
+    if (target?.id !== drag.target?.id || target?.before !== drag.target?.before) {
+      drag.target = target;
+      setDropPreview({ draggedId: drag.id, target });
+    }
+    drag.frame = window.requestAnimationFrame(updateCardDrag);
+  };
+
+  const startCardDrag = (
+    event: PointerEvent<HTMLButtonElement>,
+    id: string
+  ) => {
+    if (event.button !== 0 || !event.isPrimary || dragState.current) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragState.current = {
+      id,
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      x: event.clientX,
+      y: event.clientY,
+      frame: null,
+      target: null,
+    };
+  };
+
+  const trackCardDrag = (event: PointerEvent<HTMLButtonElement>) => {
+    const drag = dragState.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+
+    if (drag.frame === null && Math.abs(drag.y - drag.startY) >= 5) {
+      setDropPreview({ draggedId: drag.id, target: null });
+      updateCardDrag();
+    }
+  };
+
+  const finishCardDrag = (event: PointerEvent<HTMLButtonElement>) => {
+    const drag = dragState.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragState.current = null;
+    if (drag.frame === null) return;
+
+    window.cancelAnimationFrame(drag.frame);
+    setDropPreview(null);
+    const list = listRef.current;
+    if (event.type === "pointerup" && list) {
+      const target = findCardDrop(list, {
+        id: drag.id,
+        x: event.clientX,
+        y: event.clientY,
+      });
+      if (target) moveCard(drag.id, target);
+    }
+  };
+
+  const moveCardWithKeyboard = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number
+  ) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    if (dragState.current) return;
+
+    const before = event.key === "ArrowUp";
+    const target = items[index + (before ? -1 : 1)];
+    if (target) moveCard(items[index].editorId, { id: target.editorId, before });
+  };
+
+  const title = kind === "release" ? "Release" : "Ticket";
+  const handleLabel = kind === "release" ? "Déplacer la release" : "Déplacer le ticket";
+  const hintId = `${kind}-drag-hint`;
+
+  return (
+    <>
+      {items.length > 1 && (
+        <p id={hintId} className="reorder-hint">
+          Fais glisser la poignée ou utilise les flèches haut et bas.
+        </p>
+      )}
+      <div className={`reorder-list ${kind}-list`} ref={listRef}>
+        {items.map((item, index) => {
+          const target = dropPreview?.target;
+          let placement: "before" | "after" | undefined;
+          if (target?.id === item.editorId) {
+            placement = target.before ? "before" : "after";
+          }
+
+          return (
+            <div
+              className={`dynamic-card reorder-card ${kind}-card`}
+              key={item.editorId}
+              data-reorder-id={item.editorId}
+              data-dragging={dropPreview?.draggedId === item.editorId || undefined}
+              data-drop={placement}
+            >
+              <div className="dynamic-card-header">
+                <div className="reorder-card-title">
+                  {items.length > 1 && (
+                    <button
+                      type="button"
+                      className="reorder-handle"
+                      aria-label={`${handleLabel} ${index + 1} sur ${items.length}`}
+                      aria-describedby={hintId}
+                      aria-keyshortcuts="ArrowUp ArrowDown"
+                      title="Glisser ou utiliser les flèches haut et bas"
+                      onPointerDown={(event) => startCardDrag(event, item.editorId)}
+                      onPointerMove={trackCardDrag}
+                      onPointerUp={finishCardDrag}
+                      onPointerCancel={finishCardDrag}
+                      onLostPointerCapture={finishCardDrag}
+                      onKeyDown={(event) => moveCardWithKeyboard(event, index)}
+                    >
+                      <span aria-hidden="true" />
+                    </button>
+                  )}
+                  <strong>{title} {index + 1}</strong>
+                </div>
+                <button
+                  type="button"
+                  className="remove-button"
+                  onClick={() => onRemove(item.editorId)}
+                >
+                  Supprimer
+                </button>
+              </div>
+              {children(item)}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
 // ==========================================
 // APPLICATION
 // ==========================================
@@ -179,18 +444,33 @@ function App() {
     ...savedData.sprint,
   }));
 
-  const [releases, setReleases] = useState<Release[]>(() =>
-    Array.isArray(savedData.releases) ? savedData.releases : initialReleases
+  const [releases, setReleases] = useState(() =>
+    toEditableItems(
+      Array.isArray(savedData.releases) ? savedData.releases : initialReleases
+    )
   );
 
-  const [tickets, setTickets] = useState<Ticket[]>(() =>
-    Array.isArray(savedData.tickets) ? savedData.tickets : initialTickets
+  const [tickets, setTickets] = useState(() =>
+    toEditableItems(
+      Array.isArray(savedData.tickets) ? savedData.tickets : initialTickets
+    )
   );
 
   const [history, setHistory] =
     useState<SprintHistoryItem[]>(loadSprintHistory);
   const [activeTab, setActiveTab] = useState<"general" | "history">("general");
   const [copied, setCopied] = useState(false);
+  const [moveNotice, setMoveNotice] = useState<CardMove | null>(null);
+  const movedItems = moveNotice?.kind === "release" ? releases : tickets;
+  const lastMovedIndex = movedItems.findIndex(
+    ({ editorId }) => editorId === moveNotice?.id
+  );
+
+  useEffect(() => {
+    if (!moveNotice) return;
+    const timer = window.setTimeout(() => setMoveNotice(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [moveNotice]);
 
   // ==========================================
   // SAUVEGARDE AUTOMATIQUE
@@ -199,7 +479,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem(
       "sprintly-data",
-      JSON.stringify({ sprint, releases, tickets })
+      JSON.stringify({
+        sprint,
+        releases: toSavedItems(releases),
+        tickets: toSavedItems(tickets),
+      })
     );
   }, [sprint, releases, tickets]);
 
@@ -210,6 +494,43 @@ function App() {
   // ==========================================
   // CALCULS
   // ==========================================
+
+  const velocitySprints = history.slice(0, 8).reverse().map((item) => ({
+    id: item.id,
+    name: item.sprint?.name || "Sprint",
+    planned: Number(item.sprint?.plannedVelocity || 0),
+    actual: Number(item.sprint?.actualVelocity || 0),
+  }));
+  const velocityValues = velocitySprints.flatMap(({ planned, actual }) => [
+    planned,
+    actual,
+  ]);
+  const highestVelocity = Math.max(0, ...velocityValues);
+  const lowestVelocity = Math.min(0, ...velocityValues);
+  const velocityRange = highestVelocity - lowestVelocity;
+  const negativeIntervals =
+    lowestVelocity === 0
+      ? 0
+      : highestVelocity === 0
+        ? 4
+        : Math.max(
+            1,
+            Math.min(3, Math.round((-lowestVelocity / velocityRange) * 4))
+          );
+  const positiveIntervals = 4 - negativeIntervals;
+  const velocityStep = Math.max(
+    1,
+    Math.ceil(highestVelocity / (positiveIntervals || 1)),
+    Math.ceil(-lowestVelocity / (negativeIntervals || 1))
+  );
+  const velocityTicks = [4, 3, 2, 1, 0].map(
+    (interval) => (interval - negativeIntervals) * velocityStep
+  );
+
+  const velocityBarStyle = (points: number) => ({
+    top: `${(positiveIntervals - Math.max(0, points) / velocityStep) * 25}%`,
+    height: `${(Math.abs(points) / velocityStep) * 25}%`,
+  });
 
   const remainingPoints = tickets.reduce(
     (total, ticket) => total + Number(ticket.points || 0),
@@ -244,50 +565,53 @@ function App() {
     setSprint((previous) => ({ ...previous, [field]: value }));
   };
 
-  const updateRelease = (
-    index: number,
-    field: keyof Release,
-    value: string
-  ) => {
+  const updateRelease = (id: string, field: keyof Release, value: string) => {
     setReleases((previous) =>
-      previous.map((release, i) =>
-        i === index ? { ...release, [field]: value } : release
+      previous.map((release) =>
+        release.editorId === id ? { ...release, [field]: value } : release
       )
     );
   };
 
   const addRelease = () => {
-    setReleases((previous) => [
-      ...previous,
-      { version: "", date: "", name: "", description: "", link: "" },
-    ]);
+    const release = {
+      editorId: makeId(),
+      version: "",
+      date: "",
+      name: "",
+      description: "",
+      link: "",
+    };
+    setReleases((previous) => [...previous, release]);
+    setMoveNotice(null);
   };
 
-  const removeRelease = (index: number) => {
-    setReleases((previous) => previous.filter((_, i) => i !== index));
+  const removeRelease = (id: string) => {
+    setReleases((previous) => previous.filter(({ editorId }) => editorId !== id));
+    setMoveNotice(null);
   };
 
   const updateTicket = (
-    index: number,
+    id: string,
     field: keyof Ticket,
     value: string | number
   ) => {
     setTickets((previous) =>
-      previous.map((ticket, i) =>
-        i === index ? { ...ticket, [field]: value } : ticket
+      previous.map((ticket) =>
+        ticket.editorId === id ? { ...ticket, [field]: value } : ticket
       )
     );
   };
 
   const addTicket = () => {
-    setTickets((previous) => [
-      ...previous,
-      { key: "", title: "", points: 0 },
-    ]);
+    const ticket = { editorId: makeId(), key: "", title: "", points: 0 };
+    setTickets((previous) => [...previous, ticket]);
+    setMoveNotice(null);
   };
 
-  const removeTicket = (index: number) => {
-    setTickets((previous) => previous.filter((_, i) => i !== index));
+  const removeTicket = (id: string) => {
+    setTickets((previous) => previous.filter(({ editorId }) => editorId !== id));
+    setMoveNotice(null);
   };
 
   // ==========================================
@@ -299,8 +623,8 @@ function App() {
       id: makeId(),
       savedAt: new Date().toISOString(),
       sprint: { ...sprint },
-      releases: releases.map((release) => ({ ...release })),
-      tickets: tickets.map((ticket) => ({ ...ticket })),
+      releases: toSavedItems(releases),
+      tickets: toSavedItems(tickets),
     };
 
     setHistory((previous) => [newItem, ...previous]);
@@ -309,8 +633,9 @@ function App() {
 
   const loadSprintFromHistory = (item: SprintHistoryItem) => {
     setSprint({ ...item.sprint });
-    setReleases(item.releases.map((release) => ({ ...release })));
-    setTickets(item.tickets.map((ticket) => ({ ...ticket })));
+    setReleases(toEditableItems(item.releases));
+    setTickets(toEditableItems(item.tickets));
+    setMoveNotice(null);
     setActiveTab("general");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -322,8 +647,9 @@ function App() {
 
   const duplicateSprintFromHistory = (item: SprintHistoryItem) => {
     setSprint({ ...item.sprint, name: `${item.sprint.name} (copie)` });
-    setReleases(item.releases.map((release) => ({ ...release })));
-    setTickets(item.tickets.map((ticket) => ({ ...ticket })));
+    setReleases(toEditableItems(item.releases));
+    setTickets(toEditableItems(item.tickets));
+    setMoveNotice(null);
     setActiveTab("general");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -434,7 +760,7 @@ function App() {
 <tr><td style="background:#111;padding:36px 32px;">
 <div style="font-size:11px;letter-spacing:3px;color:#aaa;margin-bottom:18px;">RAPPORT DE SPRINT</div>
 <div style="font-size:30px;line-height:38px;font-weight:bold;color:#fff;">${escapeHtml(sprint.name)}</div>
-</td></tr>
+  </td></tr>
 
 <tr><td style="padding:30px 32px;font-size:13px;line-height:23px;color:#444;">
 Bonjour à tous,<br><br>
@@ -619,6 +945,7 @@ ${sprint.signatories}
         <button
           type="button"
           className={`nav-item ${activeTab === "general" ? "active" : ""}`}
+          aria-current={activeTab === "general" ? "page" : undefined}
           onClick={() => setActiveTab("general")}
         >
           ◈ &nbsp; Rapport de sprint
@@ -627,6 +954,7 @@ ${sprint.signatories}
         <button
           type="button"
           className={`nav-item ${activeTab === "history" ? "active" : ""}`}
+          aria-current={activeTab === "history" ? "page" : undefined}
           onClick={() => setActiveTab("history")}
         >
           ◷ &nbsp; Historique des sprints
@@ -760,14 +1088,18 @@ ${sprint.signatories}
                       Comparaison entre la vélocité prévue et réalisée.
                     </p>
                   </div>
-                  <span className="velocity-period">
-                    {Math.min(history.length, 8)} derniers sprints
-                  </span>
+                  {velocitySprints.length > 0 && (
+                    <span className="velocity-period">
+                      {velocitySprints.length === 1
+                        ? "1 sprint affiché"
+                        : `${velocitySprints.length} derniers sprints`}
+                    </span>
+                  )}
                 </div>
 
                 {history.length === 0 ? (
                   <div className="velocity-empty">
-                    Enregistre plusieurs sprints pour afficher leur comparaison.
+                    Enregistre un sprint pour afficher ses vélocités.
                   </div>
                 ) : (
                   <div className="velocity-chart">
@@ -782,69 +1114,48 @@ ${sprint.signatories}
                       </span>
                     </div>
 
-                    <div className="velocity-chart-grid">
-                      {[100, 75, 50, 25, 0].map((value) => (
-                        <div className="chart-grid-line" key={value}>
-                          <span>{value}%</span>
+                    <div
+                      className="velocity-chart-grid"
+                      tabIndex={0}
+                      role="group"
+                      aria-label="Vélocités prévues et réalisées, en points"
+                    >
+                      {velocityTicks.map((value) => (
+                        <div
+                          className={`chart-grid-line${value === 0 ? " chart-grid-zero" : ""}`}
+                          key={value}
+                        >
+                          <span>{formatPoints.format(value)} pts</span>
                           <div />
                         </div>
                       ))}
 
                       <div className="velocity-bars">
-                        {history
-                          .slice(0, 8)
-                          .reverse()
-                          .map((item) => {
-                            const planned = Number(
-                              item.sprint?.plannedVelocity || 0
-                            );
-                            const actual = Number(
-                              item.sprint?.actualVelocity || 0
-                            );
-
-                            const maxScale = Math.max(
-                              ...history.slice(0, 8).map((entry) =>
-                                Math.max(
-                                  Number(
-                                    entry.sprint?.plannedVelocity || 0
-                                  ),
-                                  Number(
-                                    entry.sprint?.actualVelocity || 0
-                                  )
-                                )
-                              ),
-                              1
-                            );
-
-                            const plannedHeight = (planned / maxScale) * 100;
-                            const actualHeight = (actual / maxScale) * 100;
-
-                            return (
+                        {velocitySprints.map(({ id, name, planned, actual }) => (
+                          <div
+                            className="velocity-bar-group"
+                            key={id}
+                            role="group"
+                            aria-label={`${name}, prévu ${formatPoints.format(planned)} points, réalisé ${formatPoints.format(actual)} points`}
+                          >
+                            <div className="velocity-bar-container">
                               <div
-                                className="velocity-bar-group"
-                                key={item.id}
-                              >
-                                <div className="velocity-bar-container">
-                                  <div
-                                    className="velocity-bar planned-bar"
-                                    style={{ height: `${plannedHeight}%` }}
-                                    title={`Prévu : ${planned} points`}
-                                  />
-                                  <div
-                                    className="velocity-bar actual-bar"
-                                    style={{ height: `${actualHeight}%` }}
-                                    title={`Réalisé : ${actual} points`}
-                                  />
-                                </div>
-                                <span className="velocity-bar-label">
-                                  {item.sprint?.name || "Sprint"}
-                                </span>
-                                <span className="velocity-bar-value">
-                                  {actual} pts
-                                </span>
-                              </div>
-                            );
-                          })}
+                                className="velocity-bar planned-bar"
+                                style={velocityBarStyle(planned)}
+                                title={`Prévu : ${formatPoints.format(planned)} points`}
+                              />
+                              <div
+                                className="velocity-bar actual-bar"
+                                style={velocityBarStyle(actual)}
+                                title={`Réalisé : ${formatPoints.format(actual)} points`}
+                              />
+                            </div>
+                            <span className="velocity-bar-label">{name}</span>
+                            <span className="velocity-bar-value">
+                              {formatPoints.format(actual)} pts
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -852,28 +1163,31 @@ ${sprint.signatories}
               </section>
 
               {/* LISTE DES SPRINTS */}
-              <div className="history-content">
-                <div className="history-header">
-                  <div>
-                    <h2>Historique des sprints</h2>
-                    <p>
-                      Consulte et retrouve l'ensemble de tes rapports
-                      précédemment enregistrés.
-                    </p>
-                  </div>
-                  <span className="step-badge">
-                    {history.length} sprint(s)
+              <section className="history-content" aria-labelledby="history-list-title">
+                <header className="history-header">
+                  <h2 id="history-list-title">Historique des sprints</h2>
+                  <span className="history-count">
+                    {history.length} sprint{history.length > 1 ? "s" : ""}
                   </span>
-                </div>
+                </header>
 
                 {history.length === 0 ? (
                   <div className="history-empty">
-                    <div className="history-empty-icon">◷</div>
                     <h3>Aucun sprint enregistré</h3>
                     <p>
-                      Tes prochains rapports apparaîtront ici une fois
-                      enregistrés.
+                      Clique sur « Enregistrer le rapport » pour ajouter ton
+                      premier sprint à l’historique.
                     </p>
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={() => {
+                        setActiveTab("general");
+                        window.scrollTo({ top: 0 });
+                      }}
+                    >
+                      Ouvrir le rapport de sprint
+                    </button>
                   </div>
                 ) : (
                   <div className="history-list">
@@ -884,10 +1198,17 @@ ${sprint.signatories}
                       const actual = Number(
                         item.sprint?.actualVelocity || 0
                       );
+                      const difference = actual - planned;
                       const performance =
                         planned > 0
                           ? Math.round((actual / planned) * 100)
-                          : 0;
+                          : null;
+                      const period = [
+                        formatDate(item.sprint.startDate),
+                        formatDate(item.sprint.endDate),
+                      ]
+                        .filter(Boolean)
+                        .join(" — ");
 
                       const remaining = (item.tickets || []).reduce(
                         (total, ticket) =>
@@ -895,104 +1216,71 @@ ${sprint.signatories}
                         0
                       );
 
-                      const progress = Math.min(
-                        100,
-                        Math.max(0, performance)
-                      );
-
                       return (
                         <article className="history-item" key={item.id}>
                           <div className="history-item-main">
-                            <div className="history-item-title">
-                              <div className="history-item-icon">◈</div>
-                              <div>
-                                <h3>{item.sprint.name}</h3>
-                                <span>
-                                  Enregistré le{" "}
-                                  {new Date(item.savedAt).toLocaleDateString(
-                                    "fr-FR",
-                                    {
-                                      day: "2-digit",
-                                      month: "long",
-                                      year: "numeric",
-                                    }
-                                  )}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="history-item-date">
-                              <span>PÉRIODE DU SPRINT</span>
-                              <strong>
-                                {formatDate(item.sprint.startDate)}
-                                {" — "}
-                                {formatDate(item.sprint.endDate)}
-                              </strong>
-                            </div>
+                            <h3>{item.sprint.name || "Sprint"}</h3>
+                            {period && (
+                              <span className="history-item-date">{period}</span>
+                            )}
                           </div>
 
-                          <div className="history-item-metrics">
+                          <dl className="history-item-metrics">
                             <div className="history-metric">
-                              <span>Vélocité prévue</span>
-                              <strong>
-                                {planned}
-                                <small> pts</small>
-                              </strong>
+                              <dt>Vélocité prévue</dt>
+                              <dd>
+                                {formatPoints.format(planned)} <small>pts</small>
+                              </dd>
                             </div>
-
+                            <div className="history-metric history-metric-actual">
+                              <dt>Vélocité réalisée</dt>
+                              <dd>
+                                {formatPoints.format(actual)} <small>pts</small>
+                              </dd>
+                            </div>
+                            <div
+                              className="history-metric history-metric-difference"
+                              data-sign={Math.sign(difference)}
+                            >
+                              <dt>Écart</dt>
+                              <dd>
+                                {formatPointDifference.format(difference)} <small>pts</small>
+                              </dd>
+                            </div>
                             <div className="history-metric">
-                              <span>Vélocité réalisée</span>
-                              <strong>
-                                {actual}
-                                <small> pts</small>
-                              </strong>
+                              <dt>Performance</dt>
+                              <dd>
+                                {performance === null ? "—" : `${performance} %`}
+                              </dd>
                             </div>
-
-                            <div className="history-metric">
-                              <span>Points restants</span>
-                              <strong>
-                                {remaining}
-                                <small> pts</small>
-                              </strong>
-                            </div>
-
-                            <div className="history-metric">
-                              <div className="history-progress-header">
-                                <span>Performance</span>
-                                <strong>{performance}%</strong>
-                              </div>
-                              <div className="history-progress-track">
-                                <div
-                                  className="history-progress-fill"
-                                  style={{ width: `${progress}%` }}
-                                />
-                              </div>
-                              <small>
-                                {performance >= 100
-                                  ? "Objectif atteint"
-                                  : "Progression par rapport à l'objectif"}
-                              </small>
-                            </div>
-                          </div>
+                          </dl>
 
                           <div className="history-item-footer">
                             <div className="history-ticket-count">
-                              {item.tickets?.length || 0} tickets restants
-                              <span>·</span>
-                              {item.releases?.length || 0} releases
+                              <span>
+                                {item.tickets?.length || 0} ticket{item.tickets?.length === 1 ? "" : "s"}
+                                {" · "}{formatPoints.format(remaining)} pts restants
+                              </span>
+                              <span>
+                                {item.releases?.length || 0} release{item.releases?.length === 1 ? "" : "s"}
+                              </span>
+                              <span>
+                                Enregistré le{" "}
+                                {new Date(item.savedAt).toLocaleDateString("fr-FR")}
+                              </span>
                             </div>
 
                             <div className="history-actions">
                               <button
                                 type="button"
-                                className="button button-secondary"
+                                className="button button-secondary history-view-button"
                                 onClick={() => loadSprintFromHistory(item)}
                               >
                                 Consulter
                               </button>
                               <button
                                 type="button"
-                                className="button button-secondary"
+                                className="button history-quiet-button"
                                 onClick={() =>
                                   duplicateSprintFromHistory(item)
                                 }
@@ -1001,7 +1289,7 @@ ${sprint.signatories}
                               </button>
                               <button
                                 type="button"
-                                className="history-delete-button"
+                                className="button history-quiet-button history-delete-button"
                                 onClick={() =>
                                   deleteSprintFromHistory(item.id)
                                 }
@@ -1015,7 +1303,7 @@ ${sprint.signatories}
                     })}
                   </div>
                 )}
-              </div>
+              </section>
             </section>
           )}
 
@@ -1095,23 +1383,24 @@ ${sprint.signatories}
                   </div>
 
                   {/* INFORMATIONS GÉNÉRALES */}
-                  <div className="form-section">
+                  <div className="form-section compact-form-section sprint-details">
                     <div className="section-heading">
                       01 — Informations générales
                     </div>
 
-                    <div className="field">
-                      <label>Nom du sprint</label>
-                      <input
-                        value={sprint.name}
-                        onChange={(e) => updateSprint("name", e.target.value)}
-                      />
-                    </div>
-
-                    <div className="field-row">
-                      <div className="field">
-                        <label>Date de début</label>
+                    <div className="sprint-details-fields">
+                      <div className="field sprint-name-field">
+                        <label htmlFor="sprint-name">Nom du sprint</label>
                         <input
+                          id="sprint-name"
+                          value={sprint.name}
+                          onChange={(e) => updateSprint("name", e.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="sprint-start-date">Date de début</label>
+                        <input
+                          id="sprint-start-date"
                           type="date"
                           value={sprint.startDate}
                           onChange={(e) =>
@@ -1120,8 +1409,9 @@ ${sprint.signatories}
                         />
                       </div>
                       <div className="field">
-                        <label>Date de fin</label>
+                        <label htmlFor="sprint-end-date">Date de fin</label>
                         <input
+                          id="sprint-end-date"
                           type="date"
                           value={sprint.endDate}
                           onChange={(e) =>
@@ -1129,30 +1419,124 @@ ${sprint.signatories}
                           }
                         />
                       </div>
-                    </div>
-
-                    <div className="field">
-                      <label>Objectifs du sprint</label>
-                      <textarea
-                        value={sprint.objectives}
-                        onChange={(e) =>
-                          updateSprint("objectives", e.target.value)
-                        }
-                        placeholder="Un objectif par ligne"
-                      />
+                      <div className="field sprint-objectives-field">
+                        <label htmlFor="sprint-objectives">Objectifs du sprint</label>
+                        <textarea
+                          id="sprint-objectives"
+                          rows={2}
+                          value={sprint.objectives}
+                          onChange={(e) =>
+                            updateSprint("objectives", e.target.value)
+                          }
+                          placeholder="Un objectif par ligne"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  {/* INDICATEURS DE VÉLOCITÉ */}
+                  {/* RELEASES */}
                   <div className="form-section">
+                    <div className="section-heading">02 — Releases</div>
+
+                    <ReorderableCards
+                      kind="release"
+                      items={releases}
+                      setItems={setReleases}
+                      onMove={setMoveNotice}
+                      onRemove={removeRelease}
+                    >
+                      {(release) => (
+                        <>
+                          <div className="field">
+                            <label htmlFor={`release-version-${release.editorId}`}>
+                              Version
+                            </label>
+                            <input
+                              id={`release-version-${release.editorId}`}
+                              value={release.version}
+                              onChange={(event) =>
+                                updateRelease(release.editorId, "version", event.target.value)
+                              }
+                            />
+                          </div>
+
+                          <div className="field">
+                            <label htmlFor={`release-date-${release.editorId}`}>
+                              Date
+                            </label>
+                            <input
+                              id={`release-date-${release.editorId}`}
+                              type="date"
+                              value={release.date}
+                              onChange={(event) =>
+                                updateRelease(release.editorId, "date", event.target.value)
+                              }
+                            />
+                          </div>
+
+                          <div className="field">
+                            <label htmlFor={`release-name-${release.editorId}`}>
+                              Application
+                            </label>
+                            <input
+                              id={`release-name-${release.editorId}`}
+                              value={release.name}
+                              onChange={(event) =>
+                                updateRelease(release.editorId, "name", event.target.value)
+                              }
+                            />
+                          </div>
+
+                          <div className="field release-description">
+                            <label htmlFor={`release-description-${release.editorId}`}>
+                              Description de la release
+                            </label>
+                            <input
+                              id={`release-description-${release.editorId}`}
+                              value={release.description}
+                              onChange={(event) =>
+                                updateRelease(release.editorId, "description", event.target.value)
+                              }
+                            />
+                          </div>
+
+                          <div className="field release-link">
+                            <label htmlFor={`release-link-${release.editorId}`}>
+                              Lien Jira
+                            </label>
+                            <input
+                              id={`release-link-${release.editorId}`}
+                              placeholder="https://..."
+                              value={release.link}
+                              onChange={(event) =>
+                                updateRelease(release.editorId, "link", event.target.value)
+                              }
+                            />
+                          </div>
+                        </>
+                      )}
+                    </ReorderableCards>
+
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={addRelease}
+                    >
+                      + Ajouter une release
+                    </button>
+                  </div>
+
+                  {/* INDICATEURS DE VÉLOCITÉ */}
+                  <div className="form-section compact-form-section">
                     <div className="section-heading">
-                      02 — Indicateurs de vélocité
+                      03 — Indicateurs de vélocité
                     </div>
 
-                    <div className="field-row">
+                    <div className="field-row velocity-input-pair">
                       <div className="field">
-                        <label>Vélocité prévue (points)</label>
+                        <label htmlFor="planned-velocity">Vélocité prévue (points)</label>
                         <input
+                          id="planned-velocity"
                           type="number"
                           value={sprint.plannedVelocity || ""}
                           placeholder="0"
@@ -1165,8 +1549,9 @@ ${sprint.signatories}
                         />
                       </div>
                       <div className="field">
-                        <label>Vélocité réelle (points)</label>
+                        <label htmlFor="actual-velocity">Vélocité réelle (points)</label>
                         <input
+                          id="actual-velocity"
                           type="number"
                           value={sprint.actualVelocity || ""}
                           placeholder="0"
@@ -1180,183 +1565,65 @@ ${sprint.signatories}
                       </div>
                     </div>
 
-                    <div className="field-row">
-                      <div className="field">
-                        <label>Tickets au démarrage</label>
-                        <input
-                          type="number"
-                          value={sprint.startTickets || ""}
-                          placeholder="0"
-                          onChange={(e) =>
-                            updateSprint("startTickets", Number(e.target.value))
-                          }
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Points au démarrage</label>
-                        <input
-                          type="number"
-                          value={sprint.startPoints || ""}
-                          placeholder="0"
-                          onChange={(e) =>
-                            updateSprint("startPoints", Number(e.target.value))
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="field-row">
-                      <div className="field">
-                        <label>Tickets ajoutés</label>
-                        <input
-                          type="number"
-                          value={sprint.addedTickets || ""}
-                          placeholder="0"
-                          onChange={(e) =>
-                            updateSprint("addedTickets", Number(e.target.value))
-                          }
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Points ajoutés</label>
-                        <input
-                          type="number"
-                          value={sprint.addedPoints || ""}
-                          placeholder="0"
-                          onChange={(e) =>
-                            updateSprint("addedPoints", Number(e.target.value))
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="field-row">
-                      <div className="field">
-                        <label>Tickets réestimés</label>
-                        <input
-                          type="number"
-                          value={sprint.reestimatedTickets || ""}
-                          placeholder="0"
-                          onChange={(e) =>
-                            updateSprint(
-                              "reestimatedTickets",
-                              Number(e.target.value)
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="field">
-                        <label>Points réestimés</label>
-                        <input
-                          type="number"
-                          value={sprint.reestimatedPoints || ""}
-                          placeholder="0"
-                          onChange={(e) =>
-                            updateSprint(
-                              "reestimatedPoints",
-                              Number(e.target.value)
-                            )
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="field">
-                      <label>Effort bugs (points)</label>
-                      <input
-                        type="number"
-                        value={sprint.bugPoints || ""}
-                          placeholder="0"
-                        onChange={(e) =>
-                          updateSprint("bugPoints", Number(e.target.value))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  {/* RELEASES */}
-                  <div className="form-section">
-                    <div className="section-heading">03 — Releases</div>
-
-                    {releases.map((release, index) => (
-                      <div className="dynamic-card" key={index}>
-                        <div className="dynamic-card-header">
-                          <strong>Release {index + 1}</strong>
-                          <button
-                            type="button"
-                            className="remove-button"
-                            onClick={() => removeRelease(index)}
-                          >
-                            Supprimer
-                          </button>
-                        </div>
-
-                        <div className="field-row">
-                          <div className="field">
-                            <label>Version</label>
+                    <table className="velocity-input-table" aria-label="Tickets et points par catégorie">
+                      <thead>
+                        <tr>
+                          <td />
+                          <th scope="col" id="velocity-ticket-column">Tickets</th>
+                          <th scope="col" id="velocity-point-column">Points</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {([
+                          ["Au démarrage", "startTickets", "startPoints"],
+                          ["Ajoutés", "addedTickets", "addedPoints"],
+                          ["Réestimés", "reestimatedTickets", "reestimatedPoints"],
+                        ] as const).map(([label, ticketField, pointField]) => (
+                          <tr key={ticketField}>
+                            <th scope="row" id={`velocity-${ticketField}-row`}>
+                              {label}
+                            </th>
+                            <td>
+                              <input
+                                type="number"
+                                aria-labelledby={`velocity-ticket-column velocity-${ticketField}-row`}
+                                value={sprint[ticketField] || ""}
+                                placeholder="0"
+                                onChange={(e) =>
+                                  updateSprint(ticketField, Number(e.target.value))
+                                }
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                aria-labelledby={`velocity-point-column velocity-${ticketField}-row`}
+                                value={sprint[pointField] || ""}
+                                placeholder="0"
+                                onChange={(e) =>
+                                  updateSprint(pointField, Number(e.target.value))
+                                }
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <th scope="row" id="velocity-bugs-row">Bugs</th>
+                          <td />
+                          <td>
                             <input
-                              value={release.version}
+                              type="number"
+                              aria-labelledby="velocity-point-column velocity-bugs-row"
+                              value={sprint.bugPoints || ""}
+                              placeholder="0"
                               onChange={(e) =>
-                                updateRelease(index, "version", e.target.value)
+                                updateSprint("bugPoints", Number(e.target.value))
                               }
                             />
-                          </div>
-                          <div className="field">
-                            <label>Date</label>
-                            <input
-                              type="date"
-                              value={release.date}
-                              onChange={(e) =>
-                                updateRelease(index, "date", e.target.value)
-                              }
-                            />
-                          </div>
-                        </div>
-
-                        <div className="field">
-                          <label>Application</label>
-                          <input
-                            value={release.name}
-                            onChange={(e) =>
-                              updateRelease(index, "name", e.target.value)
-                            }
-                          />
-                        </div>
-
-                        <div className="field">
-                          <label>Description de la release</label>
-                          <input
-                            value={release.description}
-                            onChange={(e) =>
-                              updateRelease(
-                                index,
-                                "description",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-
-                        <div className="field">
-                          <label>Lien Jira</label>
-                          <input
-                            value={release.link}
-                            onChange={(e) =>
-                              updateRelease(index, "link", e.target.value)
-                            }
-                            placeholder="https://..."
-                          />
-                        </div>
-                      </div>
-                    ))}
-
-                    <button
-                      type="button"
-                      className="button button-secondary"
-                      onClick={addRelease}
-                    >
-                      + Ajouter une release
-                    </button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
 
                   {/* TICKETS RESTANTS */}
@@ -1365,52 +1632,56 @@ ${sprint.signatories}
                       04 — Tickets restants
                     </div>
 
-                    {tickets.map((ticket, index) => (
-                      <div className="dynamic-card" key={index}>
-                        <div className="dynamic-card-header">
-                          <strong>Ticket {index + 1}</strong>
-                          <button
-                            type="button"
-                            className="remove-button"
-                            onClick={() => removeTicket(index)}
-                          >
-                            Supprimer
-                          </button>
-                        </div>
+                    <ReorderableCards
+                      kind="ticket"
+                      items={tickets}
+                      setItems={setTickets}
+                      onMove={setMoveNotice}
+                      onRemove={removeTicket}
+                    >
+                      {(ticket) => (
+                        <>
+                          <div className="field">
+                            <label htmlFor={`ticket-key-${ticket.editorId}`}>Clé Jira</label>
+                            <input
+                              id={`ticket-key-${ticket.editorId}`}
+                              value={ticket.key}
+                              onChange={(e) =>
+                                updateTicket(ticket.editorId, "key", e.target.value)
+                              }
+                            />
+                          </div>
 
-                        <div className="field">
-                          <label>Clé Jira</label>
-                          <input
-                            value={ticket.key}
-                            onChange={(e) =>
-                              updateTicket(index, "key", e.target.value)
-                            }
-                          />
-                        </div>
+                          <div className="field">
+                            <label htmlFor={`ticket-points-${ticket.editorId}`}>
+                              Points d’effort
+                            </label>
+                            <input
+                              id={`ticket-points-${ticket.editorId}`}
+                              type="number"
+                              value={ticket.points || ""}
+                              placeholder="0"
+                              onChange={(e) =>
+                                updateTicket(ticket.editorId, "points", Number(e.target.value))
+                              }
+                            />
+                          </div>
 
-                        <div className="field">
-                          <label>Description</label>
-                          <input
-                            value={ticket.title}
-                            onChange={(e) =>
-                              updateTicket(index, "title", e.target.value)
-                            }
-                          />
-                        </div>
-
-                        <div className="field">
-                          <label>Points d'effort</label>
-                          <input
-                            type="number"
-                            value={ticket.points || ""}
-                            placeholder="0"
-                            onChange={(e) =>
-                              updateTicket(index, "points", Number(e.target.value))
-                            }
-                          />
-                        </div>
-                      </div>
-                    ))}
+                          <div className="field ticket-description">
+                            <label htmlFor={`ticket-title-${ticket.editorId}`}>
+                              Description
+                            </label>
+                            <input
+                              id={`ticket-title-${ticket.editorId}`}
+                              value={ticket.title}
+                              onChange={(e) =>
+                                updateTicket(ticket.editorId, "title", e.target.value)
+                              }
+                            />
+                          </div>
+                        </>
+                      )}
+                    </ReorderableCards>
 
                     <button
                       type="button"
@@ -1449,47 +1720,39 @@ ${sprint.signatories}
                 </section>
 
                 {/* APERÇU DU RAPPORT */}
-                <section className="preview-panel">
-                  <div className="panel-header">
-                    <h2>Aperçu du rapport</h2>
-                    <span className="step-badge">Aperçu en direct</span>
+                <section className="preview-panel" aria-labelledby="preview-title">
+                  <div className="panel-header preview-header">
+                    <h2 id="preview-title">Aperçu du rapport</h2>
+                    <div className="preview-actions">
+                      <button
+                        type="button"
+                        className="button button-primary"
+                        onClick={copyReport}
+                      >
+                        {copied ? "✓ Rapport copié !" : "Copier le rapport"}
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-secondary"
+                        onClick={downloadReport}
+                      >
+                        Télécharger le HTML
+                      </button>
+                    </div>
                   </div>
 
                   <div className="email-preview">
-                    <div className="email-toolbar">
-                      <span className="email-dot red" />
-                      <span className="email-dot yellow" />
-                      <span className="email-dot green" />
-                      <span className="email-toolbar-label">
-                        Aperçu du rapport — {sprint.name}
-                      </span>
-                    </div>
-
-                    <div className="email-body">
+                    <div
+                      className="email-body"
+                      tabIndex={0}
+                      role="region"
+                      aria-label={`Rapport de ${sprint.name || "sprint"}`}
+                    >
                       <div
                         className="html-email-preview"
                         dangerouslySetInnerHTML={{ __html: generateReport() }}
                       />
                     </div>
-                  </div>
-
-                  <div className="preview-actions">
-                    <button
-                      type="button"
-                      className="button button-primary"
-                      onClick={copyReport}
-                    >
-                      {copied ? "✓ Rapport copié !" : "Copier le rapport"}
-                    </button>
-
-                    <button
-                      type="button"
-                      className="button button-secondary"
-                      onClick={downloadReport}
-                    >
-                      Télécharger le HTML
-                    </button>
-
                   </div>
 
                   <div className="helper-card">
@@ -1504,6 +1767,20 @@ ${sprint.signatories}
               </div>
             </>
           )}
+
+          <div role="status">
+            {moveNotice && activeTab === "general" && lastMovedIndex !== -1 && (
+              <div className="card-move-toast">
+                <span className="card-move-toast-icon" aria-hidden="true">✓</span>
+                {moveNotice.kind === "release"
+                  ? "Release déplacée avec succès"
+                  : "Ticket déplacé avec succès"}
+                <span className="card-screen-reader-text">
+                  {` Position ${lastMovedIndex + 1} sur ${movedItems.length}.`}
+                </span>
+              </div>
+            )}
+          </div>
 
           {/* PIED DE PAGE */}
           <div className="footer">
