@@ -94,7 +94,23 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 10px 38px;
+  padding: 0 0 30px;
+}
+
+
+.brand-name {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.brand-name span {
+  max-width: 100%;
+  line-height: 1.4;
 }
 
 .brand-icon {
@@ -196,6 +212,28 @@ select:focus-visible {
   letter-spacing: 0;
 }
 
+@media (min-width: 761px) {
+  .sidebar {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100dvh;
+    overflow-y: auto;
+  }
+
+  .sidebar > * {
+    flex-shrink: 0;
+  }
+
+  .sidebar-bottom {
+    position: sticky;
+    bottom: -30px;
+    z-index: 1;
+    background: var(--surface);
+    padding-bottom: 16px;
+  }
+}
+
 /* MAIN */
 
 .main {
@@ -205,12 +243,31 @@ select:focus-visible {
 
 .topbar {
   height: 74px;
+  min-height: 80px;
+  flex-wrap: wrap;
+  gap: 8px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 42px;
+  padding: 10px 42px;
   background: rgba(255, 255, 255, 0.92);
   border-bottom: 1px solid var(--border);
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.webwag-logo {
+  display: block;
+  flex-shrink: 0;
+  width: 48px;
+  height: 43px;
+  object-fit: contain;
 }
 
 .breadcrumb {
@@ -951,7 +1008,6 @@ h1 {
     padding: 0 0 4px;
   }
 
-  .sidebar .brand-name span,
   .sidebar-label,
   .sidebar-bottom {
     display: none;
@@ -977,6 +1033,7 @@ h1 {
 
   .topbar-actions {
     width: 100%;
+    flex: 1;
     justify-content: flex-end;
     gap: 8px;
   }

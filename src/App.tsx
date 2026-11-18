@@ -7,6 +7,7 @@ import type {
   SetStateAction,
 } from "react";
 import "./App.css";
+import webwagLogo from "./webwag.svg";
 
 // ==========================================
 // TYPES
@@ -271,7 +272,7 @@ function ReorderableCards<T extends { editorId: string }>({
     }
 
     let lastId: string | undefined;
-    for (const card of list.querySelectorAll<HTMLElement>("[data-reorder-id]")) {
+    for (const card of Array.from(list.querySelectorAll<HTMLElement>("[data-reorder-id]"))) {
       const cardId = card.dataset.reorderId;
       if (!cardId || cardId === id) continue;
       const { top, height } = card.getBoundingClientRect();
@@ -436,7 +437,7 @@ function ReorderableCards<T extends { editorId: string }>({
 // APPLICATION
 // ==========================================
 
-function App() {
+function App({ onSignOut }: { onSignOut?: () => void }) {
   const [savedData] = useState<SavedData>(loadSavedData);
 
   const [sprint, setSprint] = useState<Sprint>(() => ({
@@ -933,7 +934,7 @@ ${sprint.signatories}
       {/* BARRE LATÉRALE */}
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-icon">S</div>
+          <img className="webwag-logo" src={webwagLogo} alt="Webwag" width={48} height={43} />
           <div className="brand-name">
             <strong>Sprintly</strong>
             <span>GESTION DES SPRINTS</span>
@@ -970,17 +971,28 @@ ${sprint.signatories}
               </div>
             </div>
           </div>
+          {onSignOut && (
+            <button
+              type="button"
+              className="button button-secondary sidebar-sign-out"
+              onClick={onSignOut}
+            >
+              Retour à la connexion
+            </button>
+          )}
         </div>
       </aside>
 
       {/* CONTENU PRINCIPAL */}
       <main className="main">
         <header className="topbar">
-          <div className="breadcrumb">
-            Espace de travail /{" "}
-            <strong>
-              {activeTab === "history" ? "Historique" : "Rapport de sprint"}
-            </strong>
+          <div className="topbar-brand">
+            <div className="breadcrumb">
+              Espace de travail /{" "}
+              <strong>
+                {activeTab === "history" ? "Historique" : "Rapport de sprint"}
+              </strong>
+            </div>
           </div>
 
           <div className="topbar-actions">
