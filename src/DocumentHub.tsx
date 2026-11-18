@@ -1,3 +1,6 @@
+import ThemeSettings from "./ThemeSettings";
+import { documentHistoryKey, readDocumentHistory, saveDocumentHistoryItem } from "./documentHistory";
+import type { DocumentHistoryItem } from "./documentHistory";
 import SprintNavigation from "./SprintNavigation";
 import type { SprintPage } from "./SprintNavigation";
 import { profileNameForEmail } from "./userProfile";
@@ -34,7 +37,29 @@ export default function DocumentHub({
   onSignOut: () => void;
   onOpenSprint?: (page: SprintPage) => void;
 }) {
+  const [view, setView] = useState<"editor" | "history">("editor");
+  const [history, setHistory] = useState<DocumentHistoryItem[]>([]);
+  const [historyError, setHistoryError] = useState("");
+
+  useEffect(() => {
+    const refresh = () => {
+      try {
+        setHistory(readDocumentHistory(email));
+        setHistoryError("");
+      } catch {
+        setHistoryError("L’historique ne peut pas être lu dans ce navigateur.");
+      }
+    };
+    refresh();
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === documentHistoryKey(email) || event.key === null) refresh();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [email]);
+
   const [type, setType] = useState<DocumentType>("");
+  const [savedDocumentId, setSavedDocumentId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [drafts, setDrafts] = useState<Record<string, Record<string, string>>>({});
@@ -85,8 +110,46 @@ export default function DocumentHub({
     generationRequest.current = null;
     setGenerating(false);
     setGenerationError("");
+    if (nextType !== type) setSavedDocumentId(null);
     setType(nextType);
     setStatus("");
+  };
+
+  const saveDocument = () => {
+    if (!type || generating) return;
+    try {
+      const id = savedDocumentId || (typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : Date.now() + "-" + Math.random().toString(16).slice(2));
+      const records = saveDocumentHistoryItem(email, {
+        id,
+        savedAt: new Date().toISOString(),
+        type,
+        title: title.trim() || documentTypes[type].title,
+        date,
+        fields: { ...drafts[type] },
+        notes: type === "minutes" ? notes : "",
+      });
+      setHistory(records);
+      setSavedDocumentId(id);
+      setHistoryError("");
+      setStatus(savedDocumentId
+        ? "Les modifications du document ont été enregistrées."
+        : "Le document a été enregistré dans l’historique.");
+    } catch {
+      setStatus("L’enregistrement a échoué. Télécharge le document pour le conserver.");
+    }
+  };
+
+  const openSavedDocument = (item: DocumentHistoryItem) => {
+    changeType(item.type);
+    setSavedDocumentId(item.id);
+    setTitle(item.title);
+    setDate(item.date);
+    setDrafts(previous => ({ ...previous, [item.type]: { ...item.fields } }));
+    setNotes(item.notes);
+    setView("editor");
+    window.scrollTo({ top: 0 });
   };
 
   const template = type === "test" || type === "minutes" ? documentTypes[type] : null;
@@ -163,29 +226,48 @@ export default function DocumentHub({
         {onOpenSprint && (
           <SprintNavigation onNavigate={onOpenSprint} />
         )}
-        <button
-          type="button"
-          className="nav-item active"
-          aria-current="page"
-          onClick={() => changeType("")}
-        >
-          <NavIcon name="documents" /> Documents
-        </button>
+        <details className="sprint-nav-group" open>
+          <summary className="nav-item sprint-nav-toggle active">
+            <NavIcon name="documents" />
+            Documents
+            <span className="sprint-nav-chevron" aria-hidden="true" />
+          </summary>
+          <div className="sprint-nav-children">
+            <button
+              type="button"
+              className={`nav-item${view === "editor" ? " active" : ""}`}
+              aria-current={view === "editor" ? "page" : undefined}
+              onClick={() => setView("editor")}
+            >
+              <NavIcon name="documents" /> Préparer un document
+            </button>
+            <button
+              type="button"
+              className={`nav-item${view === "history" ? " active" : ""}`}
+              aria-current={view === "history" ? "page" : undefined}
+              onClick={() => setView("history")}
+            >
+              <NavIcon name="history" /> Anciens travaux
+            </button>
+          </div>
+        </details>
 
-        <div className="sidebar-bottom">
-          <div className="hub-profile">
+        <div className="sidebar-bottom profile-card">
+          <div className="profile-card-heading">
             <div className="avatar">{profileName.charAt(0)}</div>
-            <div>
-              <div className="hub-profile-name">{profileName}</div>
-              <div className="hub-profile-caption">Espace de travail</div>
+            <div className="profile-card-identity">
+              <strong>{profileName}</strong>
+              <span>Espace de travail</span>
             </div>
           </div>
+          <ThemeSettings />
           <button
             type="button"
             className="button button-secondary sidebar-sign-out"
             onClick={onSignOut}
           >
-            Retour à la connexion
+            <NavIcon name="logout" />
+            <span>Déconnexion</span>
           </button>
         </div>
       </aside>
@@ -193,10 +275,53 @@ export default function DocumentHub({
         <header className="topbar">
           <div className="breadcrumb">
             Espace de travail / <strong>Documents</strong>
-            {template && <> / <strong>{template.title}</strong></>}
+            {view === "history"
+              ? <> / <strong>Anciens travaux</strong></>
+              : template && <> / <strong>{template.title}</strong></>}
           </div>
         </header>
       <div className="hub-content">
+        {view === "history" ? (
+          <section className="hub-choice document-history" aria-labelledby="document-history-title">
+            <h1 id="document-history-title">Anciens travaux</h1>
+            <p>
+              Retrouve tes rapports de test et tes comptes rendus.
+              Ils sont conservés dans ce navigateur pour ton adresse e-mail.
+            </p>
+            {historyError && <p role="alert">{historyError}</p>}
+            {history.length === 0 ? (
+              <div className="document-history-empty">
+                <h2>Aucun document enregistré</h2>
+                <p>Utilise « Enregistrer le document » depuis l’aperçu d’un document.</p>
+                <button className="button button-secondary" onClick={() => setView("editor")}>
+                  Préparer un document
+                </button>
+              </div>
+            ) : (
+              <div className="document-history-list">
+                {history.map(item => (
+                  <article className="document-history-card" key={item.id}>
+                    <div>
+                      <span className="document-history-kind" data-type={item.type}>
+                        <NavIcon name={item.type} />
+                        {documentTypes[item.type].title}
+                      </span>
+                      <h2>{item.title}</h2>
+                      <p>
+                        {item.date && <>Date du document {new Date(item.date + "T12:00:00").toLocaleDateString("fr-FR")} · </>}
+                        Enregistré le {new Date(item.savedAt).toLocaleString("fr-FR")}
+                      </p>
+                    </div>
+                    <button className="button button-secondary" onClick={() => openSavedDocument(item)}>
+                      Ouvrir
+                    </button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : (
+          <>
         <section className="hub-choice" aria-labelledby="hub-title">
           <h1 id="hub-title">Quel document veux-tu préparer ?</h1>
           <p>Choisis le format adapté à ton travail.</p>
@@ -317,12 +442,17 @@ export default function DocumentHub({
                 sandbox=""
               />
               <div className="hub-preview-actions">
+                <button className="button button-secondary" onClick={saveDocument} disabled={generating}>
+                  {savedDocumentId ? "Enregistrer les modifications" : "Enregistrer le document"}
+                </button>
                 <button className="button button-primary" onClick={copyDocument}>Copier</button>
                 <button className="button button-secondary" onClick={downloadDocument}>Télécharger le HTML</button>
               </div>
               <p role="status">{status}</p>
             </div>
           </section>
+        )}
+          </>
         )}
       </div>
       </main>

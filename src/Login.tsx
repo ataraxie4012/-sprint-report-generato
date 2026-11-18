@@ -1,5 +1,6 @@
+import { readDemoSession, saveDemoSession } from "./demoSession";
 import type { SprintPage } from "./SprintNavigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import App from "./App";
 import DocumentHub from "./DocumentHub";
@@ -9,11 +10,20 @@ import webwagLogo from "./webwag.svg";
 import "./Login.css";
 
 export default function Login() {
-  const [workspace, setWorkspace] = useState<WorkspaceRoute | null>(null);
-  const [connectedEmail, setConnectedEmail] = useState("");
+  const [initialSession] = useState(readDemoSession);
+  const [workspace, setWorkspace] = useState<WorkspaceRoute | null>(
+    initialSession?.workspace || null
+  );
+  const [connectedEmail, setConnectedEmail] = useState(initialSession?.email || "");
   const [email, setEmail] = useState("");
   const [requestedSprintPage, setRequestedSprintPage] =
-    useState<{ page: SprintPage }>({ page: "general" });
+    useState<{ page: SprintPage }>({ page: initialSession?.page || "general" });
+
+  useEffect(() => {
+    saveDemoSession(workspace ? {
+      workspace, email: connectedEmail, page: requestedSprintPage.page,
+    } : null);
+  }, [workspace, connectedEmail, requestedSprintPage]);
 
   const openDemo = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -24,6 +34,7 @@ export default function Login() {
   };
 
   const signOut = () => {
+    saveDemoSession(null);
     setWorkspace(null);
     setConnectedEmail("");
     setEmail("");

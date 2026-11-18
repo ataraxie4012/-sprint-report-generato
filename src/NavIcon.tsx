@@ -1,6 +1,10 @@
 import chanelLogo from "./chanel-logo.png";
 
 const paths = {
+  logout: "M9 5H4v14h5M13 8l4 4-4 4M8 12h12",
+  settings: "M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3Zm6 9a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z",
+  test: "M9 3h6v3H9V3Zm-1 2H5v16h14V5h-3M8 13l2 2 5-5M8 18h8",
+  minutes: "M6 3h9l4 4v14H5V3h1Zm8 0v5h5M8 12h8M8 16h8M8 19h5",
   history: "M3 10a9 9 0 1 1 1 8M3 4v6h6M12 7v5l3 2",
   documents: "M3 7V4h6l2 3h10v13H3V7Zm0 4h18",
 };

@@ -1,0 +1,117 @@
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #11131b;
+  --surface: #1b1e2a;
+  --surface-secondary: #232736;
+  --text-primary: #eff0f7;
+  --text-secondary: #bcc0d2;
+  --text-muted: #a2a8bf;
+  --border: #383e53;
+  --border-light: #2e3447;
+  --primary-dark: color-mix(in srgb, var(--primary) 55%, #ffffff) !important;
+  --primary-light: color-mix(in srgb, var(--primary) 18%, #1b1e2a) !important;
+  --primary-soft: color-mix(in srgb, var(--primary) 8%, #1b1e2a) !important;
+  --primary-border: color-mix(in srgb, var(--primary) 40%, #383e53) !important;
+  background: var(--background);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .sidebar,
+[data-theme="dark"] .topbar,
+[data-theme="dark"] .panel-header,
+[data-theme="dark"] .history-content,
+[data-theme="dark"] .history-stat-card,
+[data-theme="dark"] .theme-settings,
+[data-theme="dark"] .document-hub,
+[data-theme="dark"] .login-page,
+[data-theme="dark"] .login-access {
+  background: var(--surface);
+  color: var(--text-primary);
+  color-scheme: dark;
+}
+
+[data-theme="dark"] .dynamic-card,
+[data-theme="dark"] .field input,
+[data-theme="dark"] .field textarea,
+[data-theme="dark"] .field select,
+[data-theme="dark"] .velocity-input-table input,
+[data-theme="dark"] .login-field input,
+[data-theme="dark"] .theme-hex-controls input,
+[data-theme="dark"] .minutes-ai textarea,
+[data-theme="dark"] .hub-choice select,
+[data-theme="dark"] .hub-choice option,
+[data-theme="dark"] .login-report-example {
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .dynamic-card:hover,
+[data-theme="dark"] .field input:focus,
+[data-theme="dark"] .field textarea:focus {
+  background: var(--surface-secondary);
+  border-color: var(--primary-border);
+}
+
+[data-theme="dark"] .login-story {
+  background: radial-gradient(ellipse at 100% 75%, var(--primary-light), transparent 65%), var(--surface-secondary);
+}
+
+[data-theme="dark"] .webwag-logo,
+[data-theme="dark"] .login-brand img,
+[data-theme="dark"] .nav-chanel-logo {
+  filter: brightness(0) invert(1);
+}
+
+[data-theme="dark"] .nav-item:hover,
+[data-theme="dark"] .history-quiet-button:hover {
+  background: var(--surface-secondary);
+}
+
+[data-theme="dark"] .field label,
+[data-theme="dark"] .velocity-input-table th,
+[data-theme="dark"] .history-item-date,
+[data-theme="dark"] .history-metric dt,
+[data-theme="dark"] .history-ticket-count,
+[data-theme="dark"] .history-quiet-button,
+[data-theme="dark"] .history-empty p,
+[data-theme="dark"] .velocity-dashboard-header p,
+[data-theme="dark"] .velocity-chart-legend span,
+[data-theme="dark"] .chart-grid-line span,
+[data-theme="dark"] .velocity-bar-label,
+[data-theme="dark"] .velocity-empty,
+[data-theme="dark"] .reorder-hint,
+[data-theme="dark"] .hub-profile-caption,
+[data-theme="dark"] .hub-choice p,
+[data-theme="dark"] .minutes-ai p,
+[data-theme="dark"] .theme-settings p,
+[data-theme="dark"] .login-brand span,
+[data-theme="dark"] .login-story-content > p,
+[data-theme="dark"] .login-signature,
+[data-theme="dark"] .login-form-heading p,
+[data-theme="dark"] .login-demo-note,
+[data-theme="dark"] .login-example-heading span,
+[data-theme="dark"] .login-example-metrics dt,
+[data-theme="dark"] .login-example-footer {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .page-heading > p {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .document-history-kind[data-type="test"],
+[data-theme="dark"] .history-metric-difference[data-sign="1"] dd,
+[data-theme="dark"] .login-example-footer strong {
+  color: #83dbb8;
+}
+
+[data-theme="dark"] .history-metric-difference[data-sign="-1"] dd,
+[data-theme="dark"] .minutes-ai .minutes-ai-error,
+[data-theme="dark"] .theme-settings .theme-hex-error {
+  color: #ffa5b0;
+}
+
+[data-theme="dark"] .theme-settings::backdrop {
+  background: rgba(0, 0, 0, 0.65);
+}

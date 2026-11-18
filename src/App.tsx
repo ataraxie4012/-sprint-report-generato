@@ -1,3 +1,4 @@
+import ThemeSettings from "./ThemeSettings";
 import SprintNavigation from "./SprintNavigation";
 import type { SprintPage } from "./SprintNavigation";
 import { canOpenBothWorkspaces } from "./accessRoutes";
@@ -993,23 +994,23 @@ ${sprint.signatories}
           </button>
         )}
 
-        <div className="sidebar-bottom">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="sidebar-bottom profile-card">
+          <div className="profile-card-heading">
             <div className="avatar">{profileName.charAt(0)}</div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{profileName}</div>
-              <div style={{ fontSize: 11, opacity: 0.6 }}>
-                Espace de travail
-              </div>
+            <div className="profile-card-identity">
+              <strong>{profileName}</strong>
+              <span>Espace de travail</span>
             </div>
           </div>
+          <ThemeSettings />
           {onSignOut && (
             <button
               type="button"
               className="button button-secondary sidebar-sign-out"
               onClick={onSignOut}
             >
-              Retour à la connexion
+              <NavIcon name="logout" />
+              <span>Déconnexion</span>
             </button>
           )}
         </div>
