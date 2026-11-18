@@ -1,3 +1,5 @@
+import { canOpenBothWorkspaces, workspaceForEmail } from "./accessRoutes";
+import { profileNameForEmail } from "./userProfile";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import NavIcon from "./NavIcon";
 import { defaultAccent, getThemeMode, setThemeMode, getAccent, getSavedColors, saveHexAccent, setAccent, subscribeAccent } from "./theme";
@@ -11,7 +13,13 @@ const presets = [
   { name: "Orange", color: "#b95616" },
 ];
 
-export default function ThemeSettings() {
+export default function ThemeSettings({ email }: { email: string }) {
+  const [section, setSection] = useState<"account" | "appearance">("account");
+  const accountEmail = email.trim().toLowerCase();
+  const hasSprint = !accountEmail || workspaceForEmail(accountEmail) === "sprint";
+  const hasDocuments = !!accountEmail && (
+    workspaceForEmail(accountEmail) === "documents" || canOpenBothWorkspaces(accountEmail)
+  );
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const inputId = useId();
@@ -80,6 +88,39 @@ export default function ThemeSettings() {
             Fermer
           </button>
         </div>
+        <div className="settings-sections" aria-label="Sections des paramètres">
+          <button type="button" aria-pressed={section === "account"}
+            onClick={() => setSection("account")}>Mon compte</button>
+          <button type="button" aria-pressed={section === "appearance"}
+            onClick={() => setSection("appearance")}>Apparence</button>
+        </div>
+        {section === "account" ? (
+          <section className="settings-account" aria-label="Mon compte">
+            <div className="settings-account-heading">
+              <div className="avatar">{profileNameForEmail(accountEmail).charAt(0)}</div>
+              <h3>{profileNameForEmail(accountEmail)}</h3>
+            </div>
+            <dl>
+              <div>
+                <dt>Adresse e-mail</dt>
+                <dd>{accountEmail || "Accès démo sans e-mail"}</dd>
+              </div>
+              <div>
+                <dt>Accès aux espaces</dt>
+                <dd className="settings-access-list">
+                  {hasSprint && (
+                    <span><NavIcon name="sprint" /> Rapport de sprint et historique</span>
+                  )}
+                  {hasDocuments && (
+                    <span><NavIcon name="documents" /> Documents et anciens travaux</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+            <p>Profil de démonstration basé sur l’e-mail saisi.</p>
+          </section>
+        ) : (
+          <>
         <div className="theme-mode-setting">
           <div>
             <h3>Mode sombre</h3>
@@ -178,6 +219,8 @@ export default function ThemeSettings() {
           Rétablir le violet d’origine
         </button>
         <p className="theme-settings-status" role="status">{status}</p>
+          </>
+        )}
       </dialog>
     </>
   );

@@ -260,7 +260,7 @@ export default function DocumentHub({
               <span>Espace de travail</span>
             </div>
           </div>
-          <ThemeSettings />
+          <ThemeSettings email={email} />
           <button
             type="button"
             className="button button-secondary sidebar-sign-out"

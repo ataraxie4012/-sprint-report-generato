@@ -1002,7 +1002,7 @@ ${sprint.signatories}
               <span>Espace de travail</span>
             </div>
           </div>
-          <ThemeSettings />
+          <ThemeSettings email={email} />
           {onSignOut && (
             <button
               type="button"

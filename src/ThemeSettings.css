@@ -429,3 +429,94 @@
     font-size: 13px;
   }
 }
+
+.settings-sections {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--surface-secondary);
+}
+
+.settings-sections button {
+  flex: 1;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.settings-sections button[aria-pressed="true"] {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--primary-dark);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-account-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-block: 8px 20px;
+}
+
+.settings-account-heading h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.settings-account dl {
+  margin: 0 0 18px;
+}
+
+.settings-account dl > div {
+  margin-bottom: 18px;
+}
+
+.settings-account dt {
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.settings-account dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.settings-access-list {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-access-list > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--primary-border);
+  border-radius: var(--radius-sm);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-size: 12px;
+}
+
+.theme-settings .settings-account > p {
+  margin: 0;
+  font-size: 11px;
+}
+
+.theme-settings {
+  box-sizing: border-box;
+  width: min(560px, calc(100% - 24px));
+  height: min(600px, calc(100dvh - 24px));
+  max-height: calc(100dvh - 24px);
+}
