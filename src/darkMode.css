@@ -115,3 +115,44 @@
 [data-theme="dark"] .theme-settings::backdrop {
   background: rgba(0, 0, 0, 0.65);
 }
+
+/* Champs de saisie neutres, indépendants de la couleur d’accent. */
+:root {
+  --input-background: #ffffff;
+  --input-border: #d5d7de;
+  --input-text: #202333;
+  --input-focus: #73788d;
+}
+
+:root[data-theme="dark"] {
+  --input-background: #24262d;
+  --input-border: #50535e;
+  --input-text: #eff0f7;
+  --input-focus: #a2a8bf;
+}
+
+:root body input:not([type="color"], [type="checkbox"], [type="radio"]),
+:root body textarea {
+  background: var(--input-background);
+  border-color: var(--input-border);
+  color: var(--input-text);
+  box-shadow: none;
+}
+
+:root body input:not([type="color"], [type="checkbox"], [type="radio"]):hover,
+:root body textarea:hover {
+  border-color: var(--input-focus);
+}
+
+:root body input:not([type="color"], [type="checkbox"], [type="radio"]):focus,
+:root body textarea:focus {
+  background: var(--input-background);
+  border-color: var(--input-focus);
+  box-shadow: none;
+}
+
+:root body input:not([type="color"], [type="checkbox"], [type="radio"]):focus-visible,
+:root body textarea:focus-visible {
+  outline: 2px solid var(--input-focus);
+  outline-offset: 2px;
+}
