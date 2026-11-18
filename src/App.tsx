@@ -1,3 +1,8 @@
+import SprintNavigation from "./SprintNavigation";
+import type { SprintPage } from "./SprintNavigation";
+import { canOpenBothWorkspaces } from "./accessRoutes";
+import { profileNameForEmail } from "./userProfile";
+import NavIcon from "./NavIcon";
 import { useEffect, useRef, useState } from "react";
 import type {
   Dispatch,
@@ -437,7 +442,18 @@ function ReorderableCards<T extends { editorId: string }>({
 // APPLICATION
 // ==========================================
 
-function App({ onSignOut }: { onSignOut?: () => void }) {
+function App({
+  email = "",
+  requestedSprintPage,
+  onSignOut,
+  onOpenDocuments,
+}: {
+  email?: string;
+  requestedSprintPage?: { page: SprintPage };
+  onSignOut?: () => void;
+  onOpenDocuments?: () => void;
+}) {
+  const profileName = profileNameForEmail(email);
   const [savedData] = useState<SavedData>(loadSavedData);
 
   const [sprint, setSprint] = useState<Sprint>(() => ({
@@ -460,6 +476,10 @@ function App({ onSignOut }: { onSignOut?: () => void }) {
   const [history, setHistory] =
     useState<SprintHistoryItem[]>(loadSprintHistory);
   const [activeTab, setActiveTab] = useState<"general" | "history">("general");
+  useEffect(() => {
+    if (requestedSprintPage) setActiveTab(requestedSprintPage.page);
+  }, [requestedSprintPage]);
+
   const [copied, setCopied] = useState(false);
   const [moveNotice, setMoveNotice] = useState<CardMove | null>(null);
   const movedItems = moveNotice?.kind === "release" ? releases : tickets;
@@ -943,13 +963,17 @@ ${sprint.signatories}
 
         <div className="sidebar-label">ESPACE DE TRAVAIL</div>
 
+        {canOpenBothWorkspaces(email) ? (
+          <SprintNavigation activePage={activeTab} onNavigate={setActiveTab} />
+        ) : (
+          <>
         <button
           type="button"
           className={`nav-item ${activeTab === "general" ? "active" : ""}`}
           aria-current={activeTab === "general" ? "page" : undefined}
           onClick={() => setActiveTab("general")}
         >
-          ◈ &nbsp; Rapport de sprint
+          <NavIcon name="sprint" /> Rapport de sprint
         </button>
 
         <button
@@ -958,14 +982,22 @@ ${sprint.signatories}
           aria-current={activeTab === "history" ? "page" : undefined}
           onClick={() => setActiveTab("history")}
         >
-          ◷ &nbsp; Historique des sprints
+          <NavIcon name="history" /> Historique des sprints
         </button>
+          </>
+        )}
+
+        {onOpenDocuments && (
+          <button type="button" className="nav-item" onClick={onOpenDocuments}>
+            <NavIcon name="documents" /> Documents
+          </button>
+        )}
 
         <div className="sidebar-bottom">
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div className="avatar">M</div>
+            <div className="avatar">{profileName.charAt(0)}</div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>Manon</div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{profileName}</div>
               <div style={{ fontSize: 11, opacity: 0.6 }}>
                 Espace de travail
               </div>

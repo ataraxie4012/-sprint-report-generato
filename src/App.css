@@ -169,6 +169,11 @@ select:focus-visible {
   transition: all 0.2s ease;
 }
 
+.nav-icon {
+  display: block;
+  flex: 0 0 18px;
+}
+
 .nav-item span {
   font-size: 17px;
 }
@@ -2232,4 +2237,61 @@ h1 {
 .history-stat-card > strong {
   font-size: 30px;
   letter-spacing: -1.2px;
+}
+
+.sprint-nav-group {
+  min-width: 0;
+}
+
+.sprint-nav-toggle {
+  list-style: none;
+  cursor: pointer;
+}
+
+.sprint-nav-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.sprint-nav-toggle:focus-visible {
+  outline: 3px solid rgba(98, 88, 232, 0.2);
+  outline-offset: 2px;
+}
+
+.sprint-nav-chevron {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  margin-left: auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+}
+
+.sprint-nav-group[open] .sprint-nav-chevron {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.sprint-nav-children {
+  margin: 4px 0 12px 9px;
+  padding-left: 9px;
+  border-left: 1px solid #dedaf4;
+}
+
+.sprint-nav-children .nav-item {
+  width: 100%;
+  gap: 8px;
+  padding: 10px 8px;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .sidebar .sprint-nav-group {
+    grid-column: 1 / -1;
+  }
+
+  .sidebar .sprint-nav-toggle,
+  .sidebar .sprint-nav-children .nav-item {
+    justify-content: flex-start;
+    text-align: left;
+  }
 }
