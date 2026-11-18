@@ -520,3 +520,43 @@
   height: min(600px, calc(100dvh - 24px));
   max-height: calc(100dvh - 24px);
 }
+
+.password-settings fieldset {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.password-settings .field {
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.password-settings .field input {
+  min-height: 36px;
+  padding: 8px 10px;
+}
+
+.password-visibility {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.password-help {
+  display: block;
+  margin: 6px 0 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.theme-settings .password-error {
+  margin-top: 10px;
+  color: #ab3549;
+}
+
+[data-theme="dark"] .theme-settings .password-error {
+  color: #ffa5b0;
+}

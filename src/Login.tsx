@@ -1,3 +1,4 @@
+import { authRequest } from "./auth";
 import { readDemoSession, saveDemoSession } from "./demoSession";
 import type { SprintPage } from "./SprintNavigation";
 import { useEffect, useState } from "react";
@@ -12,33 +13,76 @@ import "./Login.css";
 export default function Login() {
   const [initialSession] = useState(readDemoSession);
   const [workspace, setWorkspace] = useState<WorkspaceRoute | null>(
-    initialSession?.workspace || null
+    null
   );
-  const [connectedEmail, setConnectedEmail] = useState(initialSession?.email || "");
+  const [connectedEmail, setConnectedEmail] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const [requestedSprintPage, setRequestedSprintPage] =
     useState<{ page: SprintPage }>({ page: initialSession?.page || "general" });
 
   useEffect(() => {
+    let cancelled = false;
+    authRequest("session").then(result => {
+      if (cancelled || !result.user) return;
+      const restoredEmail = result.user.email;
+      setConnectedEmail(restoredEmail);
+      setWorkspace(initialSession?.email === restoredEmail
+        ? initialSession.workspace
+        : workspaceForEmail(restoredEmail));
+    }).catch(() => {
+      if (!cancelled) setLoginError("Le service de connexion est indisponible. Redémarre le serveur de l’application.");
+    }).finally(() => {
+      if (!cancelled) setCheckingSession(false);
+    });
+    return () => { cancelled = true; };
+  }, [initialSession]);
+
+  useEffect(() => {
+    if (checkingSession) return;
     saveDemoSession(workspace ? {
       workspace, email: connectedEmail, page: requestedSprintPage.page,
     } : null);
-  }, [workspace, connectedEmail, requestedSprintPage]);
+  }, [workspace, connectedEmail, requestedSprintPage, checkingSession]);
 
-  const openDemo = (event: FormEvent<HTMLFormElement>) => {
+  const openWorkspace = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const normalizedEmail = email.trim().toLowerCase();
-    setConnectedEmail(normalizedEmail);
-    setRequestedSprintPage({ page: "general" });
-    setWorkspace(workspaceForEmail(normalizedEmail));
+    if (loggingIn) return;
+    setLoggingIn(true);
+    setLoginError("");
+    try {
+      const result = await authRequest("login", { email, password });
+      setConnectedEmail(result.user.email);
+      setPassword("");
+      setRequestedSprintPage({ page: "general" });
+      setWorkspace(workspaceForEmail(result.user.email));
+    } catch (cause) {
+      setLoginError(cause instanceof Error ? cause.message : "La connexion a échoué.");
+    } finally {
+      setLoggingIn(false);
+    }
   };
 
-  const signOut = () => {
-    saveDemoSession(null);
-    setWorkspace(null);
-    setConnectedEmail("");
-    setEmail("");
+  const signOut = async () => {
+    try {
+      await authRequest("logout", {});
+      saveDemoSession(null);
+      setWorkspace(null);
+      setConnectedEmail("");
+      setEmail("");
+      setPassword("");
+      setLoginError("");
+    } catch {
+      window.alert("La déconnexion a échoué. Réessaie.");
+    }
   };
+
+  if (checkingSession) {
+    return <main className="login-session-loading" role="status">Ouverture de ton espace…</main>;
+  }
 
   if (workspace && canOpenBothWorkspaces(connectedEmail)) {
     return (
@@ -111,7 +155,7 @@ export default function Login() {
       </section>
 
       <section className="login-access" aria-labelledby="login-title">
-        <form className="login-form" onSubmit={openDemo}>
+        <form className="login-form" onSubmit={openWorkspace}>
           <div className="login-form-heading">
             <h2 id="login-title">Bienvenue sur Sprintly</h2>
             <p>Accède à ton espace Webwag.</p>
@@ -131,21 +175,20 @@ export default function Login() {
             />
           </div>
 
-          <button className="button button-primary login-submit" type="submit">
-            Accéder à mon espace <span aria-hidden="true">→</span>
+          <div className="login-field login-password-field">
+            <label htmlFor="login-password">Mot de passe</label>
+            <input id="login-password" type="password" autoComplete="current-password"
+              value={password} maxLength={128}
+              onChange={event => setPassword(event.target.value)} />
+          </div>
+          {loginError && <p className="login-error" role="alert">{loginError}</p>}
+          <button className="button button-primary login-submit" type="submit" disabled={loggingIn}>
+            {loggingIn ? "Connexion…" : "Se connecter"} <span aria-hidden="true">→</span>
           </button>
 
-          <button
-            className="button button-secondary login-direct-access"
-            type="button"
-            onClick={() => setWorkspace("sprint")}
-          >
-            Ouvrir la démo du rapport de sprint
-          </button>
           <p className="login-demo-note">
-            Mode démonstration. L’e-mail choisit le parcours d’accueil.
-            L’identité et les droits d’accès devront être vérifiés
-            par un service d’authentification.
+            Première connexion ? Laisse le mot de passe vide, puis définis-le
+            dans Paramètres → Mon compte → Mot de passe.
           </p>
         </form>
       </section>

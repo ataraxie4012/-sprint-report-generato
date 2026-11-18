@@ -400,3 +400,28 @@
   margin-top: 10px;
   white-space: normal;
 }
+
+.login-password-field {
+  margin-top: 14px;
+}
+
+.login-error {
+  margin-top: 10px;
+  color: #ab3549;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.login-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.login-session-loading {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  background: var(--background);
+  color: var(--text-primary);
+  font-size: 14px;
+}

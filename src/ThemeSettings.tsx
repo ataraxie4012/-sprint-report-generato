@@ -1,3 +1,4 @@
+import PasswordSettings from "./PasswordSettings";
 import { canOpenBothWorkspaces, workspaceForEmail } from "./accessRoutes";
 import { profileNameForEmail } from "./userProfile";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
@@ -14,7 +15,7 @@ const presets = [
 ];
 
 export default function ThemeSettings({ email }: { email: string }) {
-  const [section, setSection] = useState<"account" | "appearance">("account");
+  const [section, setSection] = useState<"account" | "appearance" | "password">("account");
   const accountEmail = email.trim().toLowerCase();
   const hasSprint = !accountEmail || workspaceForEmail(accountEmail) === "sprint";
   const hasDocuments = !!accountEmail && (
@@ -91,6 +92,10 @@ export default function ThemeSettings({ email }: { email: string }) {
         <div className="settings-sections" aria-label="Sections des paramètres">
           <button type="button" aria-pressed={section === "account"}
             onClick={() => setSection("account")}>Mon compte</button>
+          {accountEmail && (
+            <button type="button" aria-pressed={section === "password"}
+              onClick={() => setSection("password")}>Mot de passe</button>
+          )}
           <button type="button" aria-pressed={section === "appearance"}
             onClick={() => setSection("appearance")}>Apparence</button>
         </div>
@@ -117,8 +122,14 @@ export default function ThemeSettings({ email }: { email: string }) {
                 </dd>
               </div>
             </dl>
-            <p>Profil de démonstration basé sur l’e-mail saisi.</p>
+            {accountEmail && (
+              <button className="button button-secondary" onClick={() => setSection("password")}>
+                Gérer mon mot de passe
+              </button>
+            )}
           </section>
+        ) : section === "password" ? (
+          <PasswordSettings email={accountEmail} />
         ) : (
           <>
         <div className="theme-mode-setting">
