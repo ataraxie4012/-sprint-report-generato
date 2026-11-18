@@ -1,3 +1,4 @@
+import MobileNavigation from "./MobileNavigation";
 import ThemeSettings from "./ThemeSettings";
 import SprintNavigation from "./SprintNavigation";
 import type { SprintPage } from "./SprintNavigation";
@@ -455,6 +456,7 @@ function App({
   onOpenDocuments?: () => void;
 }) {
   const profileName = profileNameForEmail(email);
+  const [navigationOpen, setNavigationOpen] = useState(false);
   const [savedData] = useState<SavedData>(loadSavedData);
 
   const [sprint, setSprint] = useState<Sprint>(() => ({
@@ -953,15 +955,21 @@ ${sprint.signatories}
   return (
     <div className="app">
       {/* BARRE LATÉRALE */}
-      <aside className="sidebar">
+      <aside className="sidebar" aria-label="Navigation principale" data-mobile-open={navigationOpen}>
         <div className="brand">
           <img className="webwag-logo" src={webwagLogo} alt="Webwag" width={48} height={43} />
           <div className="brand-name">
             <strong>Sprintly</strong>
             <span>GESTION DES SPRINTS</span>
           </div>
+          <MobileNavigation
+            open={navigationOpen}
+            controls="sprint-sidebar-content"
+            onToggle={() => setNavigationOpen(previous => !previous)}
+          />
         </div>
 
+        <div className="sidebar-content" id="sprint-sidebar-content">
         <div className="sidebar-label">ESPACE DE TRAVAIL</div>
 
         {canOpenBothWorkspaces(email) ? (
@@ -1013,6 +1021,7 @@ ${sprint.signatories}
               <span>Déconnexion</span>
             </button>
           )}
+        </div>
         </div>
       </aside>
 

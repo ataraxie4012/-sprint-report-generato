@@ -1,3 +1,4 @@
+import MobileNavigation from "./MobileNavigation";
 import ThemeSettings from "./ThemeSettings";
 import { documentHistoryKey, readDocumentHistory, saveDocumentHistoryItem } from "./documentHistory";
 import type { DocumentHistoryItem } from "./documentHistory";
@@ -37,6 +38,7 @@ export default function DocumentHub({
   onSignOut: () => void;
   onOpenSprint?: (page: SprintPage) => void;
 }) {
+  const [navigationOpen, setNavigationOpen] = useState(false);
   const [view, setView] = useState<"editor" | "history">("editor");
   const [history, setHistory] = useState<DocumentHistoryItem[]>([]);
   const [historyError, setHistoryError] = useState("");
@@ -213,15 +215,21 @@ export default function DocumentHub({
 
   return (
     <div className="app document-hub">
-      <aside className="sidebar" aria-label="Navigation principale">
+      <aside className="sidebar" aria-label="Navigation principale" data-mobile-open={navigationOpen}>
         <div className="brand">
           <img className="webwag-logo" src={webwagLogo} alt="Webwag" width={48} height={43} />
           <div className="brand-name">
             <strong>Sprintly</strong>
             <span>GESTION DES SPRINTS</span>
           </div>
+          <MobileNavigation
+            open={navigationOpen}
+            controls="documents-sidebar-content"
+            onToggle={() => setNavigationOpen(previous => !previous)}
+          />
         </div>
 
+        <div className="sidebar-content" id="documents-sidebar-content">
         <div className="sidebar-label">ESPACE DE TRAVAIL</div>
         {onOpenSprint && (
           <SprintNavigation onNavigate={onOpenSprint} />
@@ -269,6 +277,7 @@ export default function DocumentHub({
             <NavIcon name="logout" />
             <span>Déconnexion</span>
           </button>
+        </div>
         </div>
       </aside>
       <main className="main">
