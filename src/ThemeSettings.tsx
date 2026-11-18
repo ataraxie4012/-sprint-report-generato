@@ -23,6 +23,9 @@ export default function ThemeSettings() {
   const [hex, setHex] = useState(accent.toUpperCase());
   const [hexError, setHexError] = useState("");
   const [status, setStatus] = useState("");
+  const [colorPage, setColorPage] = useState(0);
+  const lastColorPage = Math.max(0, Math.ceil(savedColors.length / 2) - 1);
+  const currentColorPage = Math.min(colorPage, lastColorPage);
 
   useEffect(() => {
     setHex(accent.toUpperCase());
@@ -79,8 +82,8 @@ export default function ThemeSettings() {
         </div>
         <div className="theme-mode-setting">
           <div>
-            <h3>Apparence</h3>
-            <p>Mode sombre</p>
+            <h3>Mode sombre</h3>
+            <p>{mode === "dark" ? "Activé" : "Désactivé"}</p>
           </div>
           <button
             type="button"
@@ -92,11 +95,9 @@ export default function ThemeSettings() {
               ? "Apparence enregistrée."
               : "Apparence appliquée. L’enregistrement est indisponible.")}
           >
-            <span />
           </button>
         </div>
         <h3>Couleur de Sprintly</h3>
-        <p>Personnalise les boutons, les onglets actifs et les accents de ton interface.</p>
         <div className="theme-presets">
           {presets.map(preset => (
             <button key={preset.color} type="button"
@@ -109,18 +110,19 @@ export default function ThemeSettings() {
             </button>
           ))}
         </div>
-        <div className="theme-custom-color">
-          <label htmlFor={inputId}>Couleur personnalisée</label>
-          <input id={inputId} type="color" value={accent}
-            onChange={event => chooseColor(event.target.value)} />
-
-        </div>
         <form className="theme-hex-form" onSubmit={event => {
           event.preventDefault();
           applyHex();
         }} noValidate>
-          <label htmlFor={hexId}>Code hexadécimal</label>
+          <label htmlFor={hexId}>Couleur personnalisée (HEX)</label>
           <div className="theme-hex-controls">
+            <input
+              id={inputId}
+              type="color"
+              aria-label="Choisir une couleur personnalisée"
+              value={accent}
+              onChange={event => chooseColor(event.target.value)}
+            />
             <input
               id={hexId}
               type="text"
@@ -141,9 +143,22 @@ export default function ThemeSettings() {
         </form>
         {savedColors.length > 0 && (
           <section className="theme-saved-colors" aria-label="Couleurs enregistrées">
-            <h3>Couleurs enregistrées</h3>
+            <div className="theme-saved-heading">
+              <h3>Couleurs enregistrées</h3>
+              {lastColorPage > 0 && (
+                <div className="theme-color-pagination">
+                  <button type="button" aria-label="Couleurs précédentes"
+                    disabled={currentColorPage === 0}
+                    onClick={() => setColorPage(currentColorPage - 1)}>←</button>
+                  <span>{currentColorPage + 1}/{lastColorPage + 1}</span>
+                  <button type="button" aria-label="Couleurs suivantes"
+                    disabled={currentColorPage === lastColorPage}
+                    onClick={() => setColorPage(currentColorPage + 1)}>→</button>
+                </div>
+              )}
+            </div>
             <div className="theme-presets">
-              {savedColors.map(color => (
+              {savedColors.slice(currentColorPage * 2, currentColorPage * 2 + 2).map(color => (
                 <button
                   key={color}
                   type="button"
