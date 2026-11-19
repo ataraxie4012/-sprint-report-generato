@@ -1,4 +1,4 @@
-export type SessionUser = { email: string; hasPassword: boolean };
+export type SessionUser = { email: string; hasPassword: boolean; mustChangePassword: boolean };
 
 export async function authRequest(path: string, body?: unknown) {
   const response = await fetch("/api/auth/" + path, {

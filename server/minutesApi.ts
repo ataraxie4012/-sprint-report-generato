@@ -1,12 +1,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
+import { HttpError, readBody, validateMutation } from "./security.js";
 
 const fields = [
   "Synthèse", "Participants", "Sujets abordés", "Décisions prises",
   "Actions et responsables", "Points à confirmer",
 ] as const;
 
-export function minutesApi(apiKey: string, model: string): Plugin {
+export function createMinutesHandler(apiKey: string, model: string) {
   const handle = async (request: IncomingMessage, response: ServerResponse, next: () => void) => {
     if (request.url?.split("?")[0] !== "/api/generate-minutes") return next();
     const send = (status: number, body: unknown) => {
@@ -19,19 +20,8 @@ export function minutesApi(apiKey: string, model: string): Plugin {
     });
 
     try {
-      let body = "";
-      for await (const chunk of request) {
-        body += chunk.toString();
-        if (Buffer.byteLength(body, "utf8") > 150_000) {
-          return send(413, { error: "Les notes sont trop longues. Maximum 20 000 caractères." });
-        }
-      }
-      let input: { notes?: unknown; title?: unknown; date?: unknown };
-      try {
-        input = JSON.parse(body);
-      } catch {
-        return send(400, { error: "Le contenu envoyé est invalide." });
-      }
+      validateMutation(request);
+      const input = await readBody(request, 150_000);
       if (typeof input?.notes !== "string" || !input.notes.trim() || input.notes.length > 20_000) {
         return send(400, { error: "Colle entre 1 et 20 000 caractères de notes." });
       }
@@ -95,12 +85,18 @@ export function minutesApi(apiKey: string, model: string): Plugin {
       }
       send(200, { sections });
     } catch (error) {
+      if (error instanceof HttpError) return send(error.status, { error: error.message });
       send(502, { error: error instanceof Error && error.name === "TimeoutError"
         ? "La génération prend trop de temps. Réessaie."
         : "La génération a échoué. Tes notes sont conservées, tu peux réessayer." });
     }
   };
 
+  return handle;
+}
+
+export function minutesApi(apiKey: string, model: string): Plugin {
+  const handle = createMinutesHandler(apiKey, model);
   return {
     name: "sprintly-minutes-api",
     configureServer(server) { server.middlewares.use(handle); },

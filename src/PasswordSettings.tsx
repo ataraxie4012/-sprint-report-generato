@@ -2,7 +2,13 @@ import { useEffect, useId, useState } from "react";
 import type { FormEvent } from "react";
 import { authRequest } from "./auth";
 
-export default function PasswordSettings({ email }: { email: string }) {
+export default function PasswordSettings({
+  email, forceChange = false, onChanged,
+}: {
+  email: string;
+  forceChange?: boolean;
+  onChanged?: () => void;
+}) {
   const prefix = useId();
   const [loading, setLoading] = useState(true);
   const [hasPassword, setHasPassword] = useState(false);
@@ -45,6 +51,7 @@ export default function PasswordSettings({ email }: { email: string }) {
       setPassword("");
       setConfirmation("");
       setStatus("Mot de passe enregistré pour " + email + ".");
+      onChanged?.();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "L’enregistrement a échoué.");
     } finally {
@@ -54,12 +61,16 @@ export default function PasswordSettings({ email }: { email: string }) {
 
   return (
     <form className="password-settings" onSubmit={savePassword}>
-      <h3>{hasPassword ? "Modifier mon mot de passe" : "Définir mon mot de passe"}</h3>
-      <p>Ce mot de passe sera demandé à la connexion pour {email}.</p>
+      <h3>{forceChange ? "Choisis ton nouveau mot de passe" : hasPassword ? "Modifier mon mot de passe" : "Définir mon mot de passe"}</h3>
+      <p>{forceChange
+        ? "Remplace ton mot de passe temporaire pour accéder à ton espace."
+        : "Ce mot de passe sera demandé à la connexion pour " + email + "."}</p>
       <fieldset disabled={loading || saving}>
         {hasPassword && (
           <div className="field">
-            <label htmlFor={prefix + "-current"}>Mot de passe actuel</label>
+            <label htmlFor={prefix + "-current"}>
+              {forceChange ? "Mot de passe temporaire" : "Mot de passe actuel"}
+            </label>
             <input id={prefix + "-current"} type={visible ? "text" : "password"}
               autoComplete="current-password" value={currentPassword} required maxLength={128}
               onChange={event => setCurrentPassword(event.target.value)} />

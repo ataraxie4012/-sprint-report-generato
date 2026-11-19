@@ -425,3 +425,65 @@
   color: var(--text-primary);
   font-size: 14px;
 }
+
+#root:has(.first-login-page) {
+  width: 100%;
+  max-width: none;
+  border: 0;
+}
+
+.first-login-page {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 24px 16px;
+  background: var(--background);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.first-login-card {
+  width: 100%;
+  max-width: 460px;
+  padding: clamp(20px, 4vw, 32px);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  background: var(--card-background);
+}
+
+.first-login-card h1 {
+  margin: 24px 0 8px;
+  font: 800 26px/1.3 'Manrope', sans-serif;
+  color: var(--text-primary);
+}
+
+.first-login-email {
+  margin-bottom: 22px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.first-login-card .password-settings h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+
+.first-login-card .password-settings p {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.first-login-card .password-settings input:not([type="checkbox"]) {
+  font-size: 16px;
+}
+
+.first-login-card > .button {
+  margin-top: 12px;
+}
+
+.first-login-card .password-settings .password-error {
+  color: #ab3549;
+}

@@ -1,172 +1,185 @@
+import { withAccountLock } from "./accountLock.js";
 import { createProjectsHandler } from "./projectsApi.js";
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { promisify } from "node:util";
+import { createSprintsHandler } from "./sprintsApi.js";
+import { hashPassword, verifyPassword, temporaryLifetime } from "./passwords.js";
+import { randomBytes } from "node:crypto";
+import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 import { directSprintEmails, documentEmails } from "../src/accessRoutes.js";
+import { audit, digest, HttpError, isHttps, production, readBody, securityHeaders, securityStore, validateMutation } from "./security.js";
+import { readJson, writeJson } from "./storage.js";
 
-const scrypt = promisify(scryptCallback);
-type PasswordRecord = { salt: string; hash: string };
-type Session = { email: string; expires: number };
+type PasswordRecord = { salt: string; hash: string; algorithm?: "scrypt-v2"; mustChangePassword?: boolean; temporaryExpiresAt?: number };
 const allowedEmails = new Set([...directSprintEmails, ...documentEmails]);
-const sessionDuration = 12 * 60 * 60 * 1000;
 const cookieName = "sprintly_session";
+const sessionDuration = 12 * 3600000;
 
-export function authApi(root: string): Plugin {
-  const handleProjects = createProjectsHandler(root);
-  const accountsFile = join(root, ".data", "accounts.json");
-  const sessions = new Map<string, Session>();
-  const attempts = new Map<string, { count: number; expires: number }>();
-  let writes: Promise<unknown> = Promise.resolve();
-
-  const loadAccounts = async (): Promise<Record<string, PasswordRecord>> => {
-    try {
-      const records = JSON.parse(await readFile(accountsFile, "utf8"));
-      if (!records || Array.isArray(records) || typeof records !== "object"
-        || !Object.values(records).every((record) => {
-          const value = record as PasswordRecord;
-          return value && /^[a-f0-9]{32}$/.test(value.salt) && /^[a-f0-9]{128}$/.test(value.hash);
-        })) throw new Error("Fichier de comptes invalide.");
-      return records;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return {};
-      throw error;
+export function createAuthHandler(root: string) {
+  const projects = createProjectsHandler(root);
+  const sprints = createSprintsHandler(root);
+  const file = join(root, ".data", "accounts.json");
+  const store = securityStore(root);
+  const loadAccounts = async () => {
+    const records = await readJson<Record<string, PasswordRecord>>(file, {});
+    if (!records || Array.isArray(records) || typeof records !== "object" || !Object.values(records).every(record =>
+      record && /^[a-f0-9]{32}$/.test(record.salt) && /^[a-f0-9]{128}$/.test(record.hash)
+      && (record.algorithm === undefined || record.algorithm === "scrypt-v2")
+      && (record.mustChangePassword === undefined || typeof record.mustChangePassword === "boolean")
+      && (record.temporaryExpiresAt === undefined || Number.isFinite(record.temporaryExpiresAt))
+    )) throw Error("Fichier de comptes invalide.");
+    return records;
+  };
+  // Migration des temporaires existants, sans remplacer leurs mots de passe.
+  const initialize = () => withAccountLock(root, async () => {
+    const records = await loadAccounts();
+    let changed = false;
+    for (const record of Object.values(records)) {
+      if (record.mustChangePassword && record.temporaryExpiresAt === undefined) {
+        record.temporaryExpiresAt = Date.now() + temporaryLifetime;
+        changed = true;
+      }
     }
-  };
-
-  const verify = async (password: string, record: PasswordRecord) => {
-    const hash = await scrypt(password, record.salt, 64) as Buffer;
-    return timingSafeEqual(hash, Buffer.from(record.hash, "hex"));
-  };
-
-  const tokenFor = (request: IncomingMessage) =>
-    (request.headers.cookie || "").split(";")
-      .map(part => part.trim()).find(part => part.startsWith(cookieName + "="))
-      ?.slice(cookieName.length + 1);
-
+    if (changed) await writeJson(file, records, true);
+  });
+  let ready: Promise<void> | undefined;
+  const expired = (record: PasswordRecord) => record.mustChangePassword
+    && (!record.temporaryExpiresAt || record.temporaryExpiresAt <= Date.now());
   const cookie = (request: IncomingMessage, token: string, maxAge: number) =>
     `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}`
-    + (request.headers["x-forwarded-proto"] === "https" ? "; Secure" : "");
+    + (production() || isHttps(request) ? "; Secure" : "");
 
-  const middleware = async (request: IncomingMessage, response: ServerResponse, next: () => void) => {
+  return async (request: IncomingMessage, response: ServerResponse, next: () => void) => {
+    securityHeaders(response);
     const path = request.url?.split("?")[0];
     const isProjects = path === "/api/projects" || path?.startsWith("/api/projects/");
-    if (!path?.startsWith("/api/auth/") && !isProjects) return next();
+    const isSprints = path === "/api/sprints";
+    const isMinutes = path === "/api/generate-minutes";
+    if (!path?.startsWith("/api/auth/") && !isProjects && !isMinutes && !isSprints) return next();
     const send = (status: number, data: unknown) => {
       response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
       response.end(JSON.stringify(data));
     };
-
     try {
-      const token = tokenFor(request);
-      const session = token ? sessions.get(token) : undefined;
-      if (session && session.expires <= Date.now()) {
-        sessions.delete(token!);
+      if (production() && !isHttps(request)) throw new HttpError(400, "Une connexion HTTPS est requise.");
+      validateMutation(request);
+      ready ||= initialize().catch(error => { ready = undefined; throw error; });
+      await ready;
+      const token = (request.headers.cookie || "").split(";").map(part => part.trim())
+        .find(part => part.startsWith(cookieName + "="))?.slice(cookieName.length + 1) || "";
+      let session = /^[a-f0-9]{64}$/.test(token) ? await store.session(token) : undefined;
+      const records = await loadAccounts();
+      const record = session ? records[session.email] : undefined;
+      if (session && (!allowedEmails.has(session.email) || !record || expired(record) || session.version !== digest(record.hash))) {
+        await store.revoke(token);
+        session = undefined;
       }
-      const currentSession = session && session.expires > Date.now() ? session : undefined;
-      if (isProjects) {
-        if (!currentSession) return send(401, { error: "Reconnecte-toi pour accéder aux projets." });
-        return await handleProjects(request, response, currentSession.email);
+      if (isProjects || isMinutes || isSprints) {
+        if (!session) throw new HttpError(401, "Reconnecte-toi pour accéder à ton espace.");
+        if (record!.mustChangePassword) throw new HttpError(403, "Change ton mot de passe temporaire avant d’accéder à ton espace.");
+        if (isMinutes) {
+          if (request.method !== "POST") throw new HttpError(405, "Méthode indisponible.");
+          await store.rate([
+            { key: "ai:user:" + session.email, max: 20, duration: 86400000 },
+            { key: "ai:global", max: 200, duration: 86400000 },
+          ]);
+          const release = await store.lease("ai", 2);
+          let released = false;
+          const finish = () => { if (!released) { released = true; void release().catch(() => {}); } };
+          response.once("finish", finish);
+          response.once("close", finish);
+          await audit(root, "minutes.generate", session.email);
+          return next();
+        }
+        await store.rate([{ key: "api:" + session.email, max: 300, duration: 60000 }]);
+        return isSprints ? await sprints(request, response, session.email) : await projects(request, response, session.email);
       }
       if (request.method === "GET" && path === "/api/auth/session") {
-        if (!currentSession) return send(200, { user: null });
-        const records = await loadAccounts();
-        return send(200, { user: { email: currentSession.email, hasPassword: !!records[currentSession.email] } });
+        return send(200, { user: session ? { email: session.email, hasPassword: true, mustChangePassword: !!record!.mustChangePassword } : null });
       }
-      if (request.method !== "POST") return send(405, { error: "Méthode indisponible." });
-      if (request.headers.origin && new URL(request.headers.origin).host !== request.headers.host) {
-        return send(403, { error: "Origine de la requête invalide." });
-      }
-      if (!request.headers["content-type"]?.startsWith("application/json")) {
-        return send(415, { error: "Requête JSON attendue." });
-      }
-
-      let body = "";
-      for await (const chunk of request) {
-        body += chunk.toString();
-        if (Buffer.byteLength(body) > 8192) return send(413, { error: "Requête trop longue." });
-      }
-      let input: Record<string, unknown>;
-      try {
-        input = JSON.parse(body || "{}");
-        if (!input || typeof input !== "object" || Array.isArray(input)) throw Error();
-      } catch {
-        return send(400, { error: "Requête invalide." });
-      }
-
+      if (request.method !== "POST") throw new HttpError(405, "Méthode indisponible.");
+      const input = await readBody(request, 8192);
       if (path === "/api/auth/logout") {
-        if (token) sessions.delete(token);
+        if (token) await store.revoke(token);
         response.setHeader("Set-Cookie", cookie(request, "", 0));
         return send(200, { ok: true });
       }
-
       if (path === "/api/auth/login") {
-        const email = typeof input.email === "string" ? input.email.trim().toLowerCase() : "";
+        const email = typeof input.email === "string" ? input.email.trim().toLowerCase().slice(0, 254) : "";
         const password = typeof input.password === "string" ? input.password : "";
-        const attemptKey = (request.socket.remoteAddress || "") + ":" + email;
-        const previousAttempt = attempts.get(attemptKey);
-        if (previousAttempt && previousAttempt.expires > Date.now() && previousAttempt.count >= 10) {
-          return send(429, { error: "Trop de tentatives. Réessaie dans 15 minutes." });
-        }
-        const records = await loadAccounts();
-        const record = records[email];
-        if (!allowedEmails.has(email) || password.length > 128 || (record && !(await verify(password, record)))) {
-          attempts.set(attemptKey, {
-            count: previousAttempt && previousAttempt.expires > Date.now() ? previousAttempt.count + 1 : 1,
-            expires: previousAttempt && previousAttempt.expires > Date.now() ? previousAttempt.expires : Date.now() + 900000,
+        await store.rate([
+          { key: "login:account:" + email, max: 10, duration: 900000 },
+          { key: "login:source:" + request.socket.remoteAddress, max: 100, duration: 900000 },
+          { key: "login:global", max: 300, duration: 900000 },
+        ]);
+        const release = await store.lease("password", 2);
+        try {
+          const account = records[email];
+          if (!allowedEmails.has(email) || !account || password.length > 128 || expired(account)
+            || !(await verifyPassword(password, account))) {
+            await audit(root, "login", email, false);
+            throw new HttpError(401, "Adresse e-mail ou mot de passe incorrect, ou mot de passe temporaire expiré.");
+          }
+          // Migration du hash historique lors d’une connexion réussie.
+          const current = await withAccountLock(root, async () => {
+            const latest = await loadAccounts();
+            if (!latest[email] || latest[email].hash !== account.hash) throw new HttpError(401, "Le mot de passe a changé. Reconnecte-toi.");
+            if (account.algorithm !== "scrypt-v2") {
+              latest[email] = { ...account, ...await hashPassword(password) };
+              await writeJson(file, latest, true);
+            }
+            return latest[email];
           });
-          return send(401, { error: "Adresse e-mail ou mot de passe incorrect." });
-        }
-        attempts.delete(attemptKey);
-        if (token) sessions.delete(token);
-        for (const [key, value] of sessions) {
-          if (value.expires <= Date.now()) sessions.delete(key);
-        }
-        const newToken = randomBytes(32).toString("hex");
-        sessions.set(newToken, { email, expires: Date.now() + sessionDuration });
-        response.setHeader("Set-Cookie", cookie(request, newToken, sessionDuration / 1000));
-        return send(200, { user: { email, hasPassword: !!record } });
+          if (token) await store.revoke(token);
+          const newToken = randomBytes(32).toString("hex");
+          await store.createSession(newToken, { email, expires: Date.now() + sessionDuration, lastSeen: Date.now(), version: digest(current.hash) });
+          response.setHeader("Set-Cookie", cookie(request, newToken, sessionDuration / 1000));
+          await audit(root, "login", email);
+          return send(200, { user: { email, hasPassword: true, mustChangePassword: !!current.mustChangePassword } });
+        } finally { await release(); }
       }
-
       if (path === "/api/auth/password") {
-        if (!currentSession) return send(401, { error: "Reconnecte-toi pour définir ton mot de passe." });
+        if (!session) throw new HttpError(401, "Reconnecte-toi pour définir ton mot de passe.");
         const password = input.password;
         const currentPassword = typeof input.currentPassword === "string" ? input.currentPassword : "";
         if (typeof password !== "string" || password.length < 10 || password.length > 128 || currentPassword.length > 128) {
-          return send(400, { error: "Choisis un mot de passe de 10 à 128 caractères." });
+          throw new HttpError(400, "Choisis un mot de passe de 10 à 128 caractères.");
         }
-        const operation = writes.then(async () => {
-          const records = await loadAccounts();
-          const existing = records[currentSession.email];
-          if (existing && !(await verify(currentPassword, existing))) {
-            return send(403, { error: "Le mot de passe actuel est incorrect." });
-          }
-          const salt = randomBytes(16).toString("hex");
-          const hash = (await scrypt(password, salt, 64) as Buffer).toString("hex");
-          records[currentSession.email] = { salt, hash };
-          await mkdir(dirname(accountsFile), { recursive: true, mode: 0o700 });
-          const temp = accountsFile + "." + randomBytes(8).toString("hex") + ".tmp";
-          await writeFile(temp, JSON.stringify(records), { mode: 0o600 });
-          await rename(temp, accountsFile);
-          for (const [key, value] of sessions) {
-            if (value.email === currentSession.email && key !== token) sessions.delete(key);
-          }
-          send(200, { ok: true });
-        });
-        writes = operation.catch(() => {});
-        await operation;
-        return;
+        await store.rate([{ key: "password:" + session.email, max: 10, duration: 900000 }]);
+        const release = await store.lease("password", 2);
+        try {
+          const accountEmail = session.email;
+          const version = await withAccountLock(root, async () => {
+            const latest = await loadAccounts();
+            const existing = latest[accountEmail];
+            if (!existing || expired(existing) || session!.version !== digest(existing.hash)
+              || !(await verifyPassword(currentPassword, existing))) {
+              await audit(root, "password.change", accountEmail, false);
+              throw new HttpError(403, "Le mot de passe actuel est incorrect.");
+            }
+            if (password === currentPassword) throw new HttpError(400, "Choisis un mot de passe différent du mot de passe actuel.");
+            const updated = { ...await hashPassword(password), mustChangePassword: false };
+            latest[accountEmail] = updated;
+            await writeJson(file, latest, true);
+            return digest(updated.hash);
+          });
+          await store.revokeOthers(accountEmail, token, version);
+          await audit(root, "password.change", accountEmail);
+          return send(200, { ok: true });
+        } finally { await release(); }
       }
-      send(404, { error: "Page introuvable." });
-    } catch {
-      send(500, { error: "Le service de connexion est indisponible. Réessaie." });
+      throw new HttpError(404, "Page introuvable.");
+    } catch (error) {
+      const status = error instanceof HttpError ? error.status : 500;
+      if (status === 429) response.setHeader("Retry-After", "60");
+      send(status, { error: error instanceof HttpError ? error.message : "Le service est indisponible. Réessaie." });
     }
   };
+}
 
-  return {
-    name: "sprintly-auth-api",
+export function authApi(root: string): Plugin {
+  const middleware = createAuthHandler(root);
+  return { name: "sprintly-auth-api",
     configureServer(server) { server.middlewares.use(middleware); },
     configurePreviewServer(server) { server.middlewares.use(middleware); },
   };

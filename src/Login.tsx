@@ -1,9 +1,10 @@
+import PasswordSettings from "./PasswordSettings";
 import { authRequest } from "./auth";
 import { readDemoSession, saveDemoSession } from "./demoSession";
 import type { SprintPage } from "./SprintNavigation";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import App from "./App";
+import SprintWorkspace from "./SprintWorkspace";
 import DocumentHub from "./DocumentHub";
 import { canOpenBothWorkspaces, workspaceForEmail } from "./accessRoutes";
 import type { WorkspaceRoute } from "./accessRoutes";
@@ -18,6 +19,7 @@ export default function Login() {
   const [connectedEmail, setConnectedEmail] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState("");
@@ -30,6 +32,7 @@ export default function Login() {
       if (cancelled || !result.user) return;
       const restoredEmail = result.user.email;
       setConnectedEmail(restoredEmail);
+      setMustChangePassword(!!result.user.mustChangePassword);
       setWorkspace(initialSession?.email === restoredEmail
         ? initialSession.workspace
         : workspaceForEmail(restoredEmail));
@@ -56,6 +59,7 @@ export default function Login() {
     try {
       const result = await authRequest("login", { email, password });
       setConnectedEmail(result.user.email);
+      setMustChangePassword(!!result.user.mustChangePassword);
       setPassword("");
       setRequestedSprintPage({ page: "general" });
       setWorkspace(workspaceForEmail(result.user.email));
@@ -72,6 +76,7 @@ export default function Login() {
       saveDemoSession(null);
       setWorkspace(null);
       setConnectedEmail("");
+      setMustChangePassword(false);
       setEmail("");
       setPassword("");
       setLoginError("");
@@ -84,11 +89,30 @@ export default function Login() {
     return <main className="login-session-loading" role="status">Ouverture de ton espace…</main>;
   }
 
+  if (workspace && mustChangePassword) {
+    return (
+      <main className="first-login-page">
+        <section className="first-login-card">
+          <div className="login-brand">
+            <img src={webwagLogo} alt="Webwag" width={48} height={43} />
+            <div><strong>Sprintly</strong><span>PREMIÈRE CONNEXION</span></div>
+          </div>
+          <h1>Bienvenue sur Sprintly</h1>
+          <p className="first-login-email">{connectedEmail}</p>
+          <PasswordSettings email={connectedEmail} forceChange
+            onChanged={() => setMustChangePassword(false)} />
+          <button className="button button-quiet" onClick={signOut}>Déconnexion</button>
+        </section>
+      </main>
+    );
+  }
+
   if (workspace && canOpenBothWorkspaces(connectedEmail)) {
     return (
       <>
         <div hidden={workspace !== "sprint"}>
-          <App
+          <SprintWorkspace
+            key={connectedEmail}
             email={connectedEmail}
             requestedSprintPage={requestedSprintPage}
             onSignOut={signOut}
@@ -109,7 +133,7 @@ export default function Login() {
     );
   }
 
-  if (workspace === "sprint") return <App email={connectedEmail} onSignOut={signOut} />;
+  if (workspace === "sprint") return <SprintWorkspace key={connectedEmail} email={connectedEmail} onSignOut={signOut} />;
   if (workspace === "documents") {
     return <DocumentHub email={connectedEmail} onSignOut={signOut} />;
   }
@@ -178,7 +202,7 @@ export default function Login() {
           <div className="login-field login-password-field">
             <label htmlFor="login-password">Mot de passe</label>
             <input id="login-password" type="password" autoComplete="current-password"
-              value={password} maxLength={128}
+              value={password} maxLength={128} required
               onChange={event => setPassword(event.target.value)} />
           </div>
           {loginError && <p className="login-error" role="alert">{loginError}</p>}
@@ -187,8 +211,8 @@ export default function Login() {
           </button>
 
           <p className="login-demo-note">
-            Première connexion ? Laisse le mot de passe vide, puis définis-le
-            dans Paramètres → Mon compte → Mot de passe.
+            Première connexion ? Utilise le mot de passe temporaire qui t’a été transmis.
+            Tu choisiras ensuite ton propre mot de passe.
           </p>
         </form>
       </section>

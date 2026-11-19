@@ -1,8 +1,7 @@
 export type WorkspaceRoute = "sprint" | "documents";
 
 // Adresses qui ouvrent directement le rapport de sprint.
-// Cette configuration pilote la démonstration. Les droits réels devront être
-// vérifiés par le service d’authentification.
+// Liste partagée avec le serveur pour vérifier les droits d’accès.
 export const directSprintEmails: string[] = [
   "manon.fargues@webwag.com",
   "mathieu.lauga@webwag.com",

@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+import { withDataLock } from "./accountLock.js";
+import { writeJson } from "./storage.js";
+import { audit, HttpError } from "./security.js";
 import { join } from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { DocumentHistoryItem } from "../src/documentHistory.js";
@@ -29,7 +32,7 @@ function validDocument(value: unknown): value is DocumentHistoryItem {
 export function createProjectsHandler(root: string) {
   const directory = join(root, ".data");
   const file = join(directory, "projects.json");
-  let mutations: Promise<unknown> = Promise.resolve();
+
 
   const readProjects = async (): Promise<Project[]> => {
     try {
@@ -92,7 +95,7 @@ export function createProjectsHandler(root: string) {
         return send(400, { error: "Requête invalide." });
       }
 
-      const operation = mutations.then(async () => {
+      await withDataLock(root, "projects", async () => {
         const projects = await readProjects();
         let result: unknown;
         if (parts.length === 2) {
@@ -101,6 +104,7 @@ export function createProjectsHandler(root: string) {
           if (projects.some(project => project.name.toLocaleLowerCase("fr-FR") === name.toLocaleLowerCase("fr-FR"))) {
             return send(409, { error: "Un projet porte déjà ce nom." });
           }
+          if (projects.length >= 200) return send(429, { error: "Le nombre maximal de projets est atteint." });
           const project: Project = {
             id: randomUUID(), name, createdAt: new Date().toISOString(),
             createdBy: email, members: [email], documents: [],
@@ -131,6 +135,9 @@ export function createProjectsHandler(root: string) {
           } else if (parts.length === 4 && parts[3] === "documents") {
             if (!project.members.includes(email)) return send(403, { error: "Rejoins ce projet pour enregistrer un document." });
             if (!validDocument(body.document)) return send(400, { error: "Le document est invalide ou trop long." });
+            if (project.documents.length >= 1000 && !project.documents.some(item => item.id === body.document.id)) {
+              return send(429, { error: "Le nombre maximal de documents est atteint." });
+            }
             const document = { ...body.document, savedAt: new Date().toISOString() };
             project.documents = [document, ...project.documents.filter(item => item.id !== document.id)];
             result = { documents: project.documents };
@@ -138,15 +145,14 @@ export function createProjectsHandler(root: string) {
             return send(404, { error: "Page introuvable." });
           }
         }
-        await mkdir(directory, { recursive: true, mode: 0o700 });
-        const temporary = file + "." + randomUUID() + ".tmp";
-        await writeFile(temporary, JSON.stringify(projects), { mode: 0o600 });
-        await rename(temporary, file);
+        if (Buffer.byteLength(JSON.stringify(projects)) > 25_000_000) return send(413, { error: "La capacité de stockage des projets est atteinte." });
+        await writeJson(file, projects, true);
+        await audit(root, parts.includes("delete") ? "project.delete" : "project.update", email);
         send(200, result);
       });
-      mutations = operation.catch(() => {});
-      await operation;
-    } catch {
+
+    } catch (error) {
+      if (error instanceof HttpError) return send(error.status, { error: error.message });
       send(500, { error: "Impossible d’enregistrer ou de lire les projets. Réessaie." });
     }
   };

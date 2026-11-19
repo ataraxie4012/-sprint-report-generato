@@ -146,24 +146,7 @@ const initialTickets: Ticket[] = [
 // UTILITAIRES
 // ==========================================
 
-const loadSavedData = (): SavedData => {
-  try {
-    const saved = localStorage.getItem("sprintly-data");
-    return saved ? JSON.parse(saved) : {};
-  } catch {
-    return {};
-  }
-};
-
-const loadSprintHistory = (): SprintHistoryItem[] => {
-  try {
-    const saved = localStorage.getItem("sprintly-history");
-    const parsed = saved ? JSON.parse(saved) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
+export type SprintSnapshot = { data: SavedData; history: SprintHistoryItem[]; revision: number };
 
 const formatPoints = new Intl.NumberFormat("fr-FR", {
   maximumFractionDigits: 3,
@@ -489,18 +472,20 @@ function ReorderableCards<T extends { editorId: string }>({
 
 function App({
   email = "",
+  initialSnapshot,
   requestedSprintPage,
   onSignOut,
   onOpenDocuments,
 }: {
   email?: string;
+  initialSnapshot: SprintSnapshot;
   requestedSprintPage?: { page: SprintPage };
   onSignOut?: () => void;
   onOpenDocuments?: () => void;
 }) {
   const profileName = profileNameForEmail(email);
   const [navigationOpen, setNavigationOpen] = useState(false);
-  const [savedData] = useState<SavedData>(loadSavedData);
+  const [savedData] = useState<SavedData>(initialSnapshot.data);
 
   const [sprint, setSprint] = useState<Sprint>(() => ({
     ...initialSprint,
@@ -520,7 +505,7 @@ function App({
   );
 
   const [history, setHistory] =
-    useState<SprintHistoryItem[]>(loadSprintHistory);
+    useState<SprintHistoryItem[]>(initialSnapshot.history);
   const [activeTab, setActiveTab] = useState<"general" | "history">("general");
   useEffect(() => {
     if (requestedSprintPage) setActiveTab(requestedSprintPage.page);
@@ -544,20 +529,54 @@ function App({
   // SAUVEGARDE AUTOMATIQUE
   // ==========================================
 
+  const revision = useRef(initialSnapshot.revision);
+  const saving = useRef(false);
+  const pendingSave = useRef<Omit<SprintSnapshot, "revision"> | null>(null);
+  const saveBlocked = useRef(false);
+  const [saveError, setSaveError] = useState("");
+  const [saveAttempt, setSaveAttempt] = useState(0);
   useEffect(() => {
-    localStorage.setItem(
-      "sprintly-data",
-      JSON.stringify({
-        sprint,
-        releases: toSavedItems(releases),
-        tickets: toSavedItems(tickets),
-      })
-    );
-  }, [sprint, releases, tickets]);
-
+    const warn = (event: BeforeUnloadEvent) => {
+      if (!pendingSave.current && !saving.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
   useEffect(() => {
-    localStorage.setItem("sprintly-history", JSON.stringify(history));
-  }, [history]);
+    pendingSave.current = {
+      data: { sprint, releases: toSavedItems(releases), tickets: toSavedItems(tickets) }, history,
+    };
+    const flush = async () => {
+      if (saving.current || saveBlocked.current) return;
+      saving.current = true;
+      try {
+        while (pendingSave.current) {
+          const snapshot = pendingSave.current;
+          pendingSave.current = null;
+          const response = await fetch("/api/sprints", {
+            method: "POST", credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...snapshot, revision: revision.current }),
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            pendingSave.current ||= snapshot;
+            saveBlocked.current = true;
+            throw Error(result.error || "La sauvegarde a échoué. Tes modifications restent affichées.");
+          }
+          revision.current = result.revision;
+          setSaveError("");
+        }
+      } catch (cause) {
+        pendingSave.current ||= { data: { sprint, releases: toSavedItems(releases), tickets: toSavedItems(tickets) }, history };
+        setSaveError(cause instanceof Error ? cause.message : "La sauvegarde a échoué. Tes modifications restent affichées.");
+      } finally { saving.current = false; }
+    };
+    const timer = window.setTimeout(() => { void flush(); }, 500);
+    return () => window.clearTimeout(timer);
+  }, [sprint, releases, tickets, history, saveAttempt]);
 
   // ==========================================
   // CALCULS
@@ -998,6 +1017,16 @@ ${sprint.signatories}
 
   return (
     <div className="app">
+      {saveError && <div className="sprint-save-error" role="alert">
+        <span>{saveError}</span>
+        <button className="button button-quiet" onClick={() => {
+          const snapshot = { data: { sprint, releases: toSavedItems(releases), tickets: toSavedItems(tickets) }, history };
+          const url = URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" }));
+          const link = document.createElement("a"); link.href = url; link.download = "sprintly-sauvegarde-personnelle.json"; link.click();
+          window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }}>Télécharger mes modifications</button>
+        <button className="button" onClick={() => { saveBlocked.current = false; setSaveAttempt(value => value + 1); }}>Réessayer la sauvegarde</button>
+      </div>}
       {/* BARRE LATÉRALE */}
       <aside className="sidebar" aria-label="Navigation principale" data-mobile-open={navigationOpen}>
         <div className="brand">
@@ -1059,7 +1088,13 @@ ${sprint.signatories}
             <button
               type="button"
               className="button button-secondary sidebar-sign-out"
-              onClick={onSignOut}
+              onClick={() => {
+                if (pendingSave.current || saving.current) {
+                  setSaveError("La sauvegarde est en cours ou en attente. Enregistre tes modifications avant de te déconnecter.");
+                  return;
+                }
+                onSignOut();
+              }}
             >
               <NavIcon name="logout" />
               <span>Déconnexion</span>
