@@ -1,3 +1,4 @@
+import { createProjectsHandler } from "./projectsApi.js";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -14,6 +15,7 @@ const sessionDuration = 12 * 60 * 60 * 1000;
 const cookieName = "sprintly_session";
 
 export function authApi(root: string): Plugin {
+  const handleProjects = createProjectsHandler(root);
   const accountsFile = join(root, ".data", "accounts.json");
   const sessions = new Map<string, Session>();
   const attempts = new Map<string, { count: number; expires: number }>();
@@ -50,7 +52,8 @@ export function authApi(root: string): Plugin {
 
   const middleware = async (request: IncomingMessage, response: ServerResponse, next: () => void) => {
     const path = request.url?.split("?")[0];
-    if (!path?.startsWith("/api/auth/")) return next();
+    const isProjects = path === "/api/projects" || path?.startsWith("/api/projects/");
+    if (!path?.startsWith("/api/auth/") && !isProjects) return next();
     const send = (status: number, data: unknown) => {
       response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
       response.end(JSON.stringify(data));
@@ -63,6 +66,10 @@ export function authApi(root: string): Plugin {
         sessions.delete(token!);
       }
       const currentSession = session && session.expires > Date.now() ? session : undefined;
+      if (isProjects) {
+        if (!currentSession) return send(401, { error: "Reconnecte-toi pour accéder aux projets." });
+        return await handleProjects(request, response, currentSession.email);
+      }
       if (request.method === "GET" && path === "/api/auth/session") {
         if (!currentSession) return send(200, { user: null });
         const records = await loadAccounts();

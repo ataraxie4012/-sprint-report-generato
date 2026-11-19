@@ -1,6 +1,11 @@
+import ConfirmDialog from "./ConfirmDialog";
+import ProjectDirectory from "./ProjectDirectory";
+import { projectRequest } from "./projects";
+import type { ProjectSummary } from "./projects";
+import "./Projects.css";
 import MobileNavigation from "./MobileNavigation";
 import ThemeSettings from "./ThemeSettings";
-import { documentHistoryKey, readDocumentHistory, saveDocumentHistoryItem } from "./documentHistory";
+import { deleteDocumentHistoryItem, documentHistoryKey, readDocumentHistory, saveDocumentHistoryItem } from "./documentHistory";
 import type { DocumentHistoryItem } from "./documentHistory";
 import SprintNavigation from "./SprintNavigation";
 import type { SprintPage } from "./SprintNavigation";
@@ -39,28 +44,99 @@ export default function DocumentHub({
   onOpenSprint?: (page: SprintPage) => void;
 }) {
   const [navigationOpen, setNavigationOpen] = useState(false);
-  const [view, setView] = useState<"editor" | "history">("editor");
+  const [view, setView] = useState<"projects" | "editor" | "history">("projects");
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [projectsError, setProjectsError] = useState("");
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const currentProjectId = useRef(projectId);
+  currentProjectId.current = projectId;
+  const activeProject = projects.find(project => project.id === projectId);
+  const [savingDocument, setSavingDocument] = useState(false);
+
+  const refreshProjects = async () => {
+    setProjectsLoading(true);
+    try {
+      const result = await projectRequest();
+      setProjects(result.projects);
+      setProjectsError("");
+    } catch (cause) {
+      setProjectsError(cause instanceof Error ? cause.message : "Les projets sont indisponibles.");
+    } finally { setProjectsLoading(false); }
+  };
+
+  useEffect(() => { void refreshProjects(); }, [email]);
+  useEffect(() => {
+    if (!projectsLoading && !projectsError && projectId
+      && !projects.some(project => project.id === projectId && project.joined)) {
+      setProjectId(null);
+      setView("projects");
+      setType("");
+      setSavedDocumentId(null);
+      setTitle("");
+      setDate("");
+      setDrafts({});
+      setNotes("");
+      generationRequest.current?.abort();
+      generationRequest.current = null;
+      setGenerating(false);
+    }
+  }, [projects, projectsLoading, projectsError, projectId]);
+
   const [history, setHistory] = useState<DocumentHistoryItem[]>([]);
   const [historyError, setHistoryError] = useState("");
+  const [historyMessage, setHistoryMessage] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDeletion, setPendingDeletion] = useState<{
+    document: DocumentHistoryItem;
+    projectId: string | null;
+  } | null>(null);
+  const [deletionError, setDeletionError] = useState("");
   const [historyQuery, setHistoryQuery] = useState("");
   const [historyFilter, setHistoryFilter] = useState<"all" | "test" | "minutes">("all");
+  const documentReturnPage = useRef<{
+    view: "projects" | "editor" | "history";
+    projectId: string | null;
+    query: string;
+    filter: "all" | "test" | "minutes";
+  } | null>(null);
+
+  const rememberDocumentOrigin = () => {
+    documentReturnPage.current = {
+      view, projectId, query: historyQuery, filter: historyFilter,
+    };
+  };
+
 
   useEffect(() => {
-    const refresh = () => {
+    let cancelled = false;
+    const refresh = async () => {
       try {
-        setHistory(readDocumentHistory(email));
-        setHistoryError("");
-      } catch {
-        setHistoryError("L’historique ne peut pas être lu dans ce navigateur.");
+        const records = projectId
+          ? (await projectRequest("/" + projectId + "/documents")).documents
+          : readDocumentHistory(email);
+        if (!cancelled) {
+          setHistory(records);
+          setHistoryError("");
+        }
+      } catch (cause) {
+        if (!cancelled) {
+          setHistory([]);
+          setHistoryError(cause instanceof Error ? cause.message : "L’historique est indisponible.");
+        }
       }
     };
-    refresh();
+    setHistory([]);
+    void refresh();
     const onStorage = (event: StorageEvent) => {
-      if (event.key === documentHistoryKey(email) || event.key === null) refresh();
+      if (!projectId && (event.key === documentHistoryKey(email) || event.key === null)) void refresh();
     };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [email]);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [email, projectId, view]);
 
   const [type, setType] = useState<DocumentType>("");
   const [savedDocumentId, setSavedDocumentId] = useState<string | null>(null);
@@ -119,13 +195,15 @@ export default function DocumentHub({
     setStatus("");
   };
 
-  const saveDocument = () => {
-    if (!type || generating) return;
+  const saveDocument = async () => {
+    if (!type || generating || savingDocument) return;
+    const destinationProject = projectId;
+    setSavingDocument(true);
     try {
       const id = savedDocumentId || (typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
         : Date.now() + "-" + Math.random().toString(16).slice(2));
-      const records = saveDocumentHistoryItem(email, {
+      const document: DocumentHistoryItem = {
         id,
         savedAt: new Date().toISOString(),
         type,
@@ -133,19 +211,90 @@ export default function DocumentHub({
         date,
         fields: { ...drafts[type] },
         notes: type === "minutes" ? notes : "",
-      });
+      };
+      const records = destinationProject
+        ? (await projectRequest("/" + destinationProject + "/documents", { document })).documents
+        : saveDocumentHistoryItem(email, document);
+      if (currentProjectId.current !== destinationProject) return;
       setHistory(records);
+      if (destinationProject) {
+        setProjects(previous => previous.map(project => project.id === destinationProject
+          ? { ...project, documentCount: records.length } : project));
+      }
       setSavedDocumentId(id);
       setHistoryError("");
       setStatus(savedDocumentId
         ? "Les modifications du document ont été enregistrées."
         : "Le document a été enregistré dans l’historique.");
-    } catch {
-      setStatus("L’enregistrement a échoué. Télécharge le document pour le conserver.");
+    } catch (cause) {
+      setStatus(cause instanceof Error ? cause.message : "L’enregistrement a échoué.");
+    } finally { setSavingDocument(false); }
+  };
+
+  const selectProject = (
+    project: ProjectSummary | null,
+    nextView: "editor" | "history" = "history"
+  ) => {
+    if (projectId !== (project?.id || null)) {
+      changeType("");
+      setSavedDocumentId(null);
+      setTitle("");
+      setDate("");
+      setDrafts({});
+      setNotes("");
+    }
+    setHistoryMessage("");
+    setProjectId(project?.id || null);
+    setView(nextView);
+    setNavigationOpen(false);
+    setHistoryQuery("");
+    setHistoryFilter("all");
+  };
+
+  const startNewDocument = () => {
+    rememberDocumentOrigin();
+    changeType("");
+    setSavedDocumentId(null);
+    setTitle("");
+    setDate("");
+    setDrafts({});
+    setNotes("");
+    setView("editor");
+    window.scrollTo({ top: 0 });
+  };
+
+  const deleteDocument = async () => {
+    if (!pendingDeletion || deletingId || savingDocument) return;
+    const item = pendingDeletion.document;
+    const destinationProject = pendingDeletion.projectId;
+    setDeletionError("");
+    setDeletingId(item.id);
+    setHistoryError("");
+    setHistoryMessage("");
+    try {
+      const records: DocumentHistoryItem[] = destinationProject
+        ? (await projectRequest("/" + destinationProject + "/documents/delete", { id: item.id })).documents
+        : deleteDocumentHistoryItem(email, item.id);
+      if (currentProjectId.current !== destinationProject) return;
+      setHistory(records);
+      if (destinationProject) {
+        setProjects(previous => previous.map(project => project.id === destinationProject
+          ? { ...project, documentCount: records.length } : project));
+      }
+      if (savedDocumentId === item.id) setSavedDocumentId(null);
+      setHistoryMessage("Le document a été supprimé.");
+      setPendingDeletion(null);
+    } catch (cause) {
+      if (currentProjectId.current === destinationProject) {
+        setDeletionError(cause instanceof Error ? cause.message : "La suppression a échoué.");
+      }
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const openSavedDocument = (item: DocumentHistoryItem) => {
+    rememberDocumentOrigin();
     changeType(item.type);
     setSavedDocumentId(item.id);
     setTitle(item.title);
@@ -154,6 +303,23 @@ export default function DocumentHub({
     setNotes(item.notes);
     setView("editor");
     window.scrollTo({ top: 0 });
+  };
+
+  const returnFromDocument = () => {
+    const previous = documentReturnPage.current;
+    if (view !== "editor" || !previous) {
+      setView("projects");
+      return;
+    }
+    generationRequest.current?.abort();
+    generationRequest.current = null;
+    setGenerating(false);
+    setGenerationError("");
+    setProjectId(previous.projectId);
+    setView(previous.view);
+    setHistoryQuery(previous.query);
+    setHistoryFilter(previous.filter);
+    setNavigationOpen(false);
   };
 
   const template = type === "test" || type === "minutes" ? documentTypes[type] : null;
@@ -247,25 +413,31 @@ export default function DocumentHub({
         <details className="sprint-nav-group" open>
           <summary className="nav-item sprint-nav-toggle active">
             <NavIcon name="documents" />
-            Documents
+            Projets
             <span className="sprint-nav-chevron" aria-hidden="true" />
           </summary>
           <div className="sprint-nav-children">
+            {projects.filter(project => project.joined)
+              .sort((first, second) => first.name.localeCompare(second.name, "fr"))
+              .map(project => (
+                <button
+                  type="button"
+                  key={project.id}
+                  className={`nav-item project-nav-item${projectId === project.id && view !== "projects" ? " active" : ""}`}
+                  aria-current={projectId === project.id && view !== "projects" ? "page" : undefined}
+                  onClick={() => selectProject(project)}
+                >
+                  <NavIcon name="documents" />
+                  <span className="project-nav-name">{project.name}</span>
+                </button>
+              ))}
             <button
               type="button"
-              className={`nav-item${view === "editor" ? " active" : ""}`}
-              aria-current={view === "editor" ? "page" : undefined}
-              onClick={() => setView("editor")}
+              className={`nav-item${view === "projects" ? " active" : ""}`}
+              aria-current={view === "projects" ? "page" : undefined}
+              onClick={() => setView("projects")}
             >
-              <NavIcon name="documents" /> Préparer un document
-            </button>
-            <button
-              type="button"
-              className={`nav-item${view === "history" ? " active" : ""}`}
-              aria-current={view === "history" ? "page" : undefined}
-              onClick={() => setView("history")}
-            >
-              <NavIcon name="history" /> Anciens travaux
+              <NavIcon name="settings" /> Gérer mes projets
             </button>
           </div>
         </details>
@@ -292,14 +464,44 @@ export default function DocumentHub({
       </aside>
       <main className="main">
       <div className="hub-content">
+        {view === "projects" ? (
+          <ProjectDirectory projects={projects} loading={projectsLoading} error={projectsError}
+            onRefresh={refreshProjects} onOpen={selectProject} />
+        ) : (
+          <>
+            <div className="project-context">
+              <button type="button" className="button button-quiet" onClick={returnFromDocument}>
+                {view === "editor" ? "← Retour" : "← Projets"}
+              </button>
+              <span>/</span>
+              <strong>{activeProject?.name || "Projets"}</strong>
+              {view === "editor" && template && (
+                <><span>/</span><span>{template.title}</span></>
+              )}
+              {view === "editor" && (
+                <div className="project-context-actions">
+                  <button type="button" className="button button-secondary"
+                    onClick={() => setView("history")}>Voir les documents</button>
+                </div>
+              )}
+            </div>
         {view === "history" ? (
           <section className="hub-choice document-history" aria-labelledby="document-history-title">
-            <h1 id="document-history-title">Anciens travaux</h1>
+            <div className="project-documents-heading">
+              <h1 id="document-history-title">{activeProject?.name || "Documents"}</h1>
+              {projectId && (
+                <button type="button" className="button button-primary" onClick={startNewDocument}>
+                  Créer un nouveau document
+                </button>
+              )}
+            </div>
             <p>
-              Retrouve tes rapports de test et tes comptes rendus.
-              Ils sont conservés dans ce navigateur pour ton adresse e-mail.
+              {projectId
+                ? "Rapports de test et comptes rendus partagés dans ce projet."
+                : "Tes anciens documents conservés dans ce navigateur, avant leur classement dans un projet."}
             </p>
             {historyError && <p role="alert">{historyError}</p>}
+            {historyMessage && <p className="document-history-message" role="status">{historyMessage}</p>}
             {history.length > 0 && (
               <div className="document-history-toolbar">
                 <div className="document-history-search">
@@ -330,9 +532,9 @@ export default function DocumentHub({
             {history.length === 0 ? (
               <div className="document-history-empty">
                 <h2>Aucun document enregistré</h2>
-                <p>Utilise « Enregistrer le document » depuis l’aperçu d’un document.</p>
-                <button className="button button-secondary" onClick={() => setView("editor")}>
-                  Préparer un document
+                <p>Crée un rapport de test ou un compte rendu pour commencer.</p>
+                <button className="button button-secondary" onClick={startNewDocument}>
+                  Créer un nouveau document
                 </button>
               </div>
             ) : (
@@ -349,11 +551,14 @@ export default function DocumentHub({
                 )}
                 {filteredHistory.map(item => (
                   <article className="document-history-card" key={item.id}>
-                    <div>
+                    <div className="document-history-summary">
+                      <div className="document-type-icon" data-type={item.type} aria-hidden="true">
+                        <NavIcon name={item.type} />
+                      </div>
+                      <div className="document-history-text">
                       <h2>{item.title}</h2>
                       <div className="document-history-details">
                         <span className="document-history-kind" data-type={item.type}>
-                          <NavIcon name={item.type} />
                           {documentTypes[item.type].title}
                         </span>
                         <time dateTime={item.savedAt}>
@@ -366,10 +571,23 @@ export default function DocumentHub({
                           <span>Document du {new Date(item.date + "T12:00:00").toLocaleDateString("fr-FR")}</span>
                         )}
                       </div>
+                      </div>
                     </div>
-                    <button className="button button-secondary" onClick={() => openSavedDocument(item)}>
-                      <NavIcon name="view" /> Consulter
-                    </button>
+                    <div className="document-history-actions">
+                      <button type="button" className="button button-secondary"
+                        disabled={!!deletingId} onClick={() => openSavedDocument(item)}>
+                        <NavIcon name="view" /> Consulter
+                      </button>
+                      <button type="button" className="button document-delete-button"
+                        disabled={!!deletingId || savingDocument}
+                        onClick={() => {
+                          setDeletionError("");
+                          setPendingDeletion({ document: item, projectId });
+                        }}>
+                        <NavIcon name="trash" />
+                        {deletingId === item.id ? "Suppression…" : "Supprimer"}
+                      </button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -378,7 +596,7 @@ export default function DocumentHub({
         ) : (
           <>
         <section className="hub-choice" aria-labelledby="hub-title">
-          <h1 id="hub-title">Quel document veux-tu préparer ?</h1>
+          <h1 id="hub-title">{activeProject?.name || "Documents"}</h1>
 
           <div>
             <label htmlFor="document-type">Type de document</label>
@@ -497,8 +715,8 @@ export default function DocumentHub({
                 sandbox=""
               />
               <div className="hub-preview-actions">
-                <button className="button button-primary" onClick={saveDocument} disabled={generating}>
-                  {savedDocumentId ? "Enregistrer les modifications" : "Enregistrer le document"}
+                <button className="button button-primary" onClick={saveDocument} disabled={generating || savingDocument}>
+                  {savingDocument ? "Enregistrement…" : savedDocumentId ? "Enregistrer les modifications" : "Enregistrer le document"}
                 </button>
                 <button className="button button-secondary" onClick={copyDocument}>Copier</button>
                 <button className="button button-quiet" onClick={downloadDocument}>Télécharger le HTML</button>
@@ -509,8 +727,21 @@ export default function DocumentHub({
         )}
           </>
         )}
+          </>
+        )}
       </div>
       </main>
+      <ConfirmDialog
+        open={!!pendingDeletion}
+        title="Supprimer ce document ?"
+        description={pendingDeletion
+          ? `« ${pendingDeletion.document.title} » sera supprimé définitivement.${pendingDeletion.projectId ? " Il sera retiré pour tous les membres du projet." : ""}`
+          : ""}
+        busy={!!deletingId}
+        error={deletionError}
+        onCancel={() => setPendingDeletion(null)}
+        onConfirm={deleteDocument}
+      />
     </div>
   );
 }

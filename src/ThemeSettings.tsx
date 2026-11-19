@@ -117,7 +117,7 @@ export default function ThemeSettings({ email }: { email: string }) {
                     <span><NavIcon name="sprint" /> Rapport de sprint et historique</span>
                   )}
                   {hasDocuments && (
-                    <span><NavIcon name="documents" /> Documents et anciens travaux</span>
+                    <span><NavIcon name="documents" /> Projets et anciens travaux</span>
                   )}
                 </dd>
               </div>

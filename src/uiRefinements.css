@@ -126,19 +126,89 @@
 }
 
 .document-history-list {
-  gap: 0;
+  gap: 10px;
 }
 
 .document-history-card {
-  padding: 20px 0;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  border-radius: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
 }
 
-.document-history-card:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
+.document-history-card > .document-history-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.document-history-text {
+  min-width: 0;
+}
+
+.document-type-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-secondary);
+  color: var(--primary-dark);
+}
+
+.document-type-icon .nav-icon {
+  width: 21px;
+  height: 21px;
+}
+
+.document-type-icon[data-type="test"] {
+  color: #18744e;
+}
+
+[data-theme="dark"] .document-type-icon[data-type="test"] {
+  color: #83dbb8;
+}
+
+.document-history-card > .document-history-actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.document-history-actions .button {
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.document-history-actions .button-secondary {
+  border-style: solid;
+}
+
+.document-history-actions .document-delete-button {
+  border-left: 1px solid var(--border);
+  border-radius: 0 8px 8px 0;
+  margin-left: 4px;
+  padding-left: 12px;
+}
+
+@media (max-width: 1100px) {
+  .document-history-card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .document-history-card > .document-history-actions {
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
 }
 
 .document-history-card h2 {
@@ -219,7 +289,19 @@
   }
 
   .document-history-card {
-    padding-block: 16px;
+    padding: 14px;
+  }
+
+  .document-history-card > .document-history-summary {
+    gap: 10px;
+  }
+
+  .document-history-card h2 {
+    font-size: 16px;
+  }
+
+  .document-history-card > .document-history-actions {
+    flex-wrap: wrap;
   }
 
   .document-history-card .button {

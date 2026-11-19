@@ -334,3 +334,47 @@
   opacity: 0.5;
   cursor: default;
 }
+
+.document-history-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button.document-delete-button {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+
+.button.document-delete-button:hover {
+  background: #fff0f0;
+  color: #ab3549;
+}
+
+[data-theme="dark"] .button.document-delete-button:hover {
+  background: #3c222b;
+  color: #ffa5b0;
+}
+
+.document-history-actions .button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.document-history-message {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .document-history-actions {
+    width: 100%;
+  }
+
+  .document-history-actions .button {
+    flex: 1;
+  }
+}

@@ -34,3 +34,9 @@ export function saveDocumentHistoryItem(email: string, item: DocumentHistoryItem
   localStorage.setItem(documentHistoryKey(email), JSON.stringify(records));
   return records;
 }
+
+export function deleteDocumentHistoryItem(email: string, id: string) {
+  const records = readDocumentHistory(email).filter(item => item.id !== id);
+  localStorage.setItem(documentHistoryKey(email), JSON.stringify(records));
+  return records;
+}

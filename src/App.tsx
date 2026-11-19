@@ -1,3 +1,4 @@
+import ConfirmDialog from "./ConfirmDialog";
 import MobileNavigation from "./MobileNavigation";
 import ThemeSettings from "./ThemeSettings";
 import SprintNavigation from "./SprintNavigation";
@@ -526,6 +527,7 @@ function App({
   }, [requestedSprintPage]);
 
   const [copied, setCopied] = useState(false);
+  const [pendingSprintDeletion, setPendingSprintDeletion] = useState<string | null>(null);
   const [moveNotice, setMoveNotice] = useState<CardMove | null>(null);
   const movedItems = moveNotice?.kind === "release" ? releases : tickets;
   const lastMovedIndex = movedItems.findIndex(
@@ -707,8 +709,8 @@ function App({
   };
 
   const deleteSprintFromHistory = (id: string) => {
-    if (!window.confirm("Supprimer ce sprint de l'historique ?")) return;
     setHistory((previous) => previous.filter((item) => item.id !== id));
+    setPendingSprintDeletion(null);
   };
 
   const duplicateSprintFromHistory = (item: SprintHistoryItem) => {
@@ -1040,7 +1042,7 @@ ${sprint.signatories}
 
         {onOpenDocuments && (
           <button type="button" className="nav-item" onClick={onOpenDocuments}>
-            <NavIcon name="documents" /> Documents
+            <NavIcon name="documents" /> Projets
           </button>
         )}
 
@@ -1370,7 +1372,7 @@ ${sprint.signatories}
                                 type="button"
                                 className="button history-quiet-button history-delete-button"
                                 onClick={() =>
-                                  deleteSprintFromHistory(item.id)
+                                  setPendingSprintDeletion(item.id)
                                 }
                               >
                                 <NavIcon name="trash" /> Supprimer
@@ -1860,6 +1862,16 @@ ${sprint.signatories}
               </div>
             )}
           </div>
+
+          <ConfirmDialog
+            open={!!pendingSprintDeletion}
+            title="Supprimer ce sprint ?"
+            description="Ce rapport sera supprimé définitivement de l’historique des sprints."
+            onCancel={() => setPendingSprintDeletion(null)}
+            onConfirm={() => {
+              if (pendingSprintDeletion) deleteSprintFromHistory(pendingSprintDeletion);
+            }}
+          />
 
           {/* PIED DE PAGE */}
           <div className="footer">
