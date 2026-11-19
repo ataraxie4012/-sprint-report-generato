@@ -175,3 +175,14 @@
 :root body input[type="color"] {
   border-color: var(--input-border);
 }
+
+:root body select,
+:root body select:hover,
+:root body select:focus,
+:root body select:focus-visible {
+  background: var(--input-background);
+  border-color: var(--input-border);
+  color: var(--input-text);
+  box-shadow: none;
+  outline: none;
+}

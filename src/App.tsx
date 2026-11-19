@@ -232,6 +232,18 @@ function ReorderableCards<T extends { editorId: string }>({
 }: ReorderableCardsProps<T>) {
   const listRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<CardDrag | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const clearSelectionOutside = (event: globalThis.PointerEvent) => {
+      if (event.target instanceof Node && !listRef.current?.contains(event.target)) {
+        setSelectedCardId(null);
+      }
+    };
+    document.addEventListener("pointerdown", clearSelectionOutside);
+    return () => document.removeEventListener("pointerdown", clearSelectionOutside);
+  }, []);
+
   const [dropPreview, setDropPreview] = useState<{
     draggedId: string;
     target: CardDrop | null;
@@ -362,16 +374,32 @@ function ReorderableCards<T extends { editorId: string }>({
   };
 
   const moveCardWithKeyboard = (
-    event: KeyboardEvent<HTMLButtonElement>,
+    event: KeyboardEvent<HTMLElement>,
     index: number
   ) => {
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (event.target instanceof HTMLElement && event.target.closest(
+      'input, textarea, select, [contenteditable]:not([contenteditable="false"])'
+    )) return;
     event.preventDefault();
     if (dragState.current) return;
 
     const before = event.key === "ArrowUp";
     const target = items[index + (before ? -1 : 1)];
-    if (target) moveCard(items[index].editorId, { id: target.editorId, before });
+    if (target) {
+      const card = event.currentTarget;
+      setSelectedCardId(items[index].editorId);
+      moveCard(items[index].editorId, { id: target.editorId, before });
+      window.requestAnimationFrame(() => {
+        if (!card.isConnected) return;
+        card.focus({ preventScroll: true });
+        card.scrollIntoView({
+          block: "nearest",
+          inline: "nearest",
+        });
+      });
+    }
   };
 
   const title = kind === "release" ? "Release" : "Ticket";
@@ -382,7 +410,7 @@ function ReorderableCards<T extends { editorId: string }>({
     <>
       {items.length > 1 && (
         <p id={hintId} className="reorder-hint">
-          Fais glisser la poignée ou utilise les flèches haut et bas.
+          Fais glisser la poignée ou sélectionne une carte puis utilise les flèches haut et bas.
         </p>
       )}
       <div className={`reorder-list ${kind}-list`} ref={listRef}>
@@ -398,6 +426,21 @@ function ReorderableCards<T extends { editorId: string }>({
               className={`dynamic-card reorder-card ${kind}-card`}
               key={item.editorId}
               data-reorder-id={item.editorId}
+              data-selected={selectedCardId === item.editorId || undefined}
+              tabIndex={0}
+              role="group"
+              aria-label={`${title} ${index + 1} sur ${items.length}`}
+              aria-describedby={items.length > 1 ? hintId : undefined}
+              onFocusCapture={() => setSelectedCardId(item.editorId)}
+              onPointerDown={event => {
+                setSelectedCardId(item.editorId);
+                if (event.target instanceof HTMLElement && !event.target.closest(
+                  'input, textarea, select, button, a, [contenteditable]'
+                )) {
+                  event.currentTarget.focus({ preventScroll: true });
+                }
+              }}
+              onKeyDown={event => moveCardWithKeyboard(event, index)}
               data-dragging={dropPreview?.draggedId === item.editorId || undefined}
               data-drop={placement}
             >
@@ -416,7 +459,6 @@ function ReorderableCards<T extends { editorId: string }>({
                       onPointerUp={finishCardDrag}
                       onPointerCancel={finishCardDrag}
                       onLostPointerCapture={finishCardDrag}
-                      onKeyDown={(event) => moveCardWithKeyboard(event, index)}
                     >
                       <span aria-hidden="true" />
                     </button>
@@ -428,7 +470,7 @@ function ReorderableCards<T extends { editorId: string }>({
                   className="remove-button"
                   onClick={() => onRemove(item.editorId)}
                 >
-                  Supprimer
+                  <NavIcon name="trash" /> Supprimer
                 </button>
               </div>
               {children(item)}
@@ -1330,7 +1372,7 @@ ${sprint.signatories}
                                 className="button button-secondary history-view-button"
                                 onClick={() => loadSprintFromHistory(item)}
                               >
-                                Consulter
+                                <NavIcon name="view" /> Consulter
                               </button>
                               <button
                                 type="button"
@@ -1339,7 +1381,7 @@ ${sprint.signatories}
                                   duplicateSprintFromHistory(item)
                                 }
                               >
-                                Dupliquer
+                                <NavIcon name="duplicate" /> Dupliquer
                               </button>
                               <button
                                 type="button"
@@ -1348,7 +1390,7 @@ ${sprint.signatories}
                                   deleteSprintFromHistory(item.id)
                                 }
                               >
-                                Supprimer
+                                <NavIcon name="trash" /> Supprimer
                               </button>
                             </div>
                           </div>

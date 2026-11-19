@@ -1,6 +1,9 @@
 import chanelLogo from "./chanel-logo.png";
 
 const paths = {
+  duplicate: "M8 8h12v13H8V8ZM16 8V3H3v14h5",
+  view: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Zm13 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
+  trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
   logout: "M9 5H4v14h5M13 8l4 4-4 4M8 12h12",
   settings: "M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3Zm6 9a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z",
   test: "M9 3h6v3H9V3Zm-1 2H5v16h14V5h-3M8 13l2 2 5-5M8 18h8",

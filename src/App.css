@@ -400,7 +400,7 @@ h1 {
 .stat-card:hover {
   transform: translateY(-3px);
   box-shadow: var(--shadow-md);
-  border-color: var(--primary-light);
+  border-color: var(--border);
 }
 
 .stat-label {
@@ -582,14 +582,14 @@ h1 {
 .dynamic-card {
   padding: 17px;
   border: 1px solid var(--border);
-  background: var(--surface-secondary);
+  background: var(--surface);
   border-radius: 11px;
   margin-bottom: 14px;
   transition: all 0.2s ease;
 }
 
 .dynamic-card:hover {
-  border-color: var(--primary-light);
+  border-color: var(--border);
   box-shadow: var(--shadow-sm);
 }
 
@@ -611,6 +611,9 @@ h1 {
 }
 
 .remove-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 0;
   background: transparent;
   color: var(--text-muted);
@@ -782,7 +785,7 @@ h1 {
   position: fixed;
   z-index: 20;
   right: max(14px, env(safe-area-inset-right));
-  bottom: max(14px, env(safe-area-inset-bottom));
+  top: max(14px, env(safe-area-inset-top));
   display: flex;
   align-items: center;
   gap: 9px;
@@ -940,10 +943,10 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: var(--primary-soft);
+  background: var(--surface);
   margin: 0 24px 24px;
   padding: 17px;
-  border: 1px solid var(--primary-soft);
+  border: 1px solid var(--border);
   border-radius: 11px;
 }
 
@@ -1344,16 +1347,16 @@ h1 {
   padding: 19px;
   margin-bottom: 15px;
 
-  background: var(--primary-soft);
-  border: 1px solid var(--primary-light);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 11px;
 
   transition: all 0.2s ease;
 }
 
 .dynamic-card:hover {
-  background: white;
-  border-color: var(--primary-light);
+  background: var(--surface);
+  border-color: var(--border);
   box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.04);
 }
 
@@ -1604,7 +1607,7 @@ h1 {
   flex-direction: column;
   gap: 11px;
   padding: 22px;
-  background: white;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 15px;
   box-shadow: var(--shadow-sm);
@@ -1656,11 +1659,11 @@ h1 {
   align-items: center;
   gap: 8px 16px;
   padding: var(--history-padding);
-  border-bottom: 1px solid var(--primary-light);
+  border-bottom: 1px solid var(--border);
   border-radius: inherit;
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
-  background: linear-gradient(100deg, var(--primary-light), var(--primary-soft));
+  background: var(--surface);
 }
 
 .history-header h2 {
@@ -1762,8 +1765,8 @@ h1 {
 }
 
 .history-metric-actual {
-  border-color: var(--primary-light);
-  background: var(--primary-soft);
+  border-color: var(--border);
+  background: var(--surface);
 }
 
 .history-metric-actual dt,
@@ -1836,7 +1839,7 @@ h1 {
   gap: 10px;
   margin: var(--history-padding);
   padding: clamp(24px, 4vw, 44px) 14px;
-  border: 1px dashed var(--primary-light);
+  border: 1px dashed var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
   text-align: center;
@@ -2077,9 +2080,9 @@ h1 {
 
 .velocity-empty {
   padding: 32px 16px;
-  border: 1px dashed var(--primary-light);
+  border: 1px dashed var(--border);
   border-radius: var(--radius-md);
-  background: var(--primary-soft);
+  background: var(--surface);
   color: #60657a;
   font-size: 13px;
   line-height: 1.5;
@@ -2238,7 +2241,7 @@ h1 {
 .history-stat-card:hover {
   transform: translateY(-3px);
   box-shadow: var(--shadow-md);
-  border-color: var(--primary-light);
+  border-color: var(--border);
 }
 
 .history-stat-card > strong {

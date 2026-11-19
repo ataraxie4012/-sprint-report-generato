@@ -211,7 +211,7 @@
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: linear-gradient(150deg, var(--surface), var(--primary-soft));
+  background: var(--surface);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.035);
 }
 

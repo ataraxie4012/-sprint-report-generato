@@ -324,3 +324,62 @@
     font-size: 22px;
   }
 }
+
+/* Les fonds des cartes restent neutres quelle que soit la couleur d’accent. */
+:root {
+  --card-background: #ffffff;
+  --card-border: #e4e5eb;
+}
+
+:root[data-theme="dark"] {
+  --card-background: #24262b;
+  --card-border: #42454c;
+}
+
+:root body :is(
+  .dynamic-card, .stat-card, .history-stat-card, .history-item,
+  .history-content, .history-header, .history-metric,
+  .history-metric-actual, .history-empty, .velocity-empty,
+  .velocity-dashboard, .minutes-ai,
+  .test-device-fields, .document-history-card, .document-history-empty,
+  .profile-card, .hub-choice, .hub-fields, .hub-preview,
+  .form-panel, .preview-panel, .panel-header
+) {
+  background: var(--card-background);
+  border-color: var(--card-border);
+}
+
+:root body .reorder-card[data-selected],
+:root body .reorder-card:has(.reorder-handle:focus-visible),
+:root body .reorder-card[data-dragging] {
+  z-index: 2;
+  opacity: 1;
+  border-color: var(--primary-dark);
+  box-shadow: 0 0 0 2px var(--primary-dark), 0 12px 28px rgba(0, 0, 0, 0.18);
+  transform: translateY(-2px);
+}
+
+:root body .reorder-card[data-selected] .reorder-handle,
+:root body .reorder-card:has(.reorder-handle:focus-visible) .reorder-handle,
+:root body .reorder-card[data-dragging] .reorder-handle {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-contrast);
+  cursor: grab;
+}
+
+:root body .reorder-card[data-dragging] .reorder-handle {
+  cursor: grabbing;
+}
+
+:root body .reorder-card:focus,
+:root body .reorder-card:focus-visible,
+:root body .reorder-handle:focus,
+:root body .reorder-handle:focus-visible {
+  outline: none;
+}
+
+:root body .helper-card {
+  background: var(--primary-soft);
+  border-color: var(--primary-border);
+}
