@@ -10,6 +10,7 @@ const object = (value: unknown): value is Record<string, unknown> => !!value && 
 const number = (value: unknown) => typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 1000000;
 function validData(value: unknown) {
   if (!object(value)) return false;
+  if (value.activeHistoryId !== undefined && value.activeHistoryId !== null && !text(value.activeHistoryId, 100)) return false;
   if (value.sprint !== undefined) {
     if (!object(value.sprint)) return false;
     const strings = ["name", "startDate", "endDate", "objectives", "reportLink", "signatories"];

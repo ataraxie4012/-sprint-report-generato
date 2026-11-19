@@ -4,7 +4,11 @@ import "./ConfirmDialog.css";
 
 export default function ConfirmDialog({
   open, title, description, busy = false, error = "", onCancel, onConfirm,
+  confirmLabel = "Supprimer", busyLabel = "Suppression…", tone = "danger",
 }: {
+  confirmLabel?: string;
+  busyLabel?: string;
+  tone?: "danger" | "neutral";
   open: boolean;
   title: string;
   description: string;
@@ -42,16 +46,16 @@ export default function ConfirmDialog({
           || event.clientY < bounds.top || event.clientY > bounds.bottom) onCancel();
       }}
     >
-      <div className="confirm-dialog-icon"><NavIcon name="trash" /></div>
+      <div className={`confirm-dialog-icon ${tone === "neutral" ? "confirm-dialog-icon-neutral" : ""}`}><NavIcon name={tone === "danger" ? "trash" : "add"} /></div>
       <h2 id={titleId}>{title}</h2>
       <p id={descriptionId}>{description}</p>
       {error && <p className="confirm-dialog-error" role="alert">{error}</p>}
       <div className="confirm-dialog-actions">
         <button ref={cancelButton} type="button" className="button button-secondary"
           disabled={busy} onClick={onCancel}>Annuler</button>
-        <button type="button" className="button confirm-dialog-delete"
+        <button type="button" className={`button ${tone === "danger" ? "confirm-dialog-delete" : "button-primary"}`}
           disabled={busy} onClick={onConfirm}>
-          <NavIcon name="trash" /> {busy ? "Suppression…" : "Supprimer"}
+          <NavIcon name={tone === "danger" ? "trash" : "add"} /> {busy ? busyLabel : confirmLabel}
         </button>
       </div>
     </dialog>

@@ -1,0 +1,16 @@
+.app-alert-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: var(--card-background);
+  color: var(--text-primary);
+  border: 1px solid var(--card-border);
+}
+.app-alert-icon-success { color: #21734b; background: #edf8f1; border-color: #cfe9d9; }
+.app-alert-icon-error { color: #ab3549; background: #fff0f0; border-color: #f2d4da; }
+[data-theme="dark"] .app-alert-icon-success { color: #8bd6ad; background: #20352a; border-color: #365241; }
+[data-theme="dark"] .app-alert-icon-error { color: #ffa5b0; background: #3c222b; border-color: #61404b; }
+.app-alert-dialog p { white-space: pre-line; overflow-wrap: anywhere; }

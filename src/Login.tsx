@@ -1,3 +1,4 @@
+import { useAlert } from "./alerts";
 import PasswordSettings from "./PasswordSettings";
 import { authRequest } from "./auth";
 import { readDemoSession, saveDemoSession } from "./demoSession";
@@ -12,6 +13,7 @@ import webwagLogo from "./webwag.svg";
 import "./Login.css";
 
 export default function Login() {
+  const showAlert = useAlert();
   const [initialSession] = useState(readDemoSession);
   const [workspace, setWorkspace] = useState<WorkspaceRoute | null>(
     null
@@ -81,7 +83,7 @@ export default function Login() {
       setPassword("");
       setLoginError("");
     } catch {
-      window.alert("La déconnexion a échoué. Réessaie.");
+      showAlert({ title: "Déconnexion impossible", message: "La déconnexion a échoué. Réessaie.", tone: "error" });
     }
   };
 

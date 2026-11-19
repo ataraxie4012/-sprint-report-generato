@@ -1,3 +1,5 @@
+import ReportPreviewDialog from "./ReportPreviewDialog";
+import { useAlert } from "./alerts";
 import ConfirmDialog from "./ConfirmDialog";
 import MobileNavigation from "./MobileNavigation";
 import ThemeSettings from "./ThemeSettings";
@@ -78,6 +80,7 @@ type SprintHistoryItem = {
 };
 
 type SavedData = {
+  activeHistoryId?: string | null;
   sprint?: Partial<Sprint>;
   releases?: Release[];
   tickets?: Ticket[];
@@ -103,6 +106,13 @@ const initialSprint: Sprint = {
   bugPoints: 6,
   reportLink: "",
   signatories: "Manon, Victoria et Mathieu",
+};
+
+const emptySprint: Sprint = {
+  name: "", startDate: "", endDate: "", objectives: "",
+  plannedVelocity: 0, actualVelocity: 0, startTickets: 0, startPoints: 0,
+  addedTickets: 0, addedPoints: 0, reestimatedTickets: 0, reestimatedPoints: 0,
+  bugPoints: 0, reportLink: "", signatories: "",
 };
 
 const initialReleases: Release[] = [
@@ -483,6 +493,7 @@ function App({
   onSignOut?: () => void;
   onOpenDocuments?: () => void;
 }) {
+  const showAlert = useAlert();
   const profileName = profileNameForEmail(email);
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [savedData] = useState<SavedData>(initialSnapshot.data);
@@ -506,12 +517,18 @@ function App({
 
   const [history, setHistory] =
     useState<SprintHistoryItem[]>(initialSnapshot.history);
+  const [activeHistoryId, setActiveHistoryId] = useState<string | null>(() =>
+    initialSnapshot.history.some(item => item.id === savedData.activeHistoryId)
+      ? savedData.activeHistoryId! : null
+  );
   const [activeTab, setActiveTab] = useState<"general" | "history">("general");
   useEffect(() => {
     if (requestedSprintPage) setActiveTab(requestedSprintPage.page);
   }, [requestedSprintPage]);
 
   const [copied, setCopied] = useState(false);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
+  const [confirmNewReport, setConfirmNewReport] = useState(false);
   const [pendingSprintDeletion, setPendingSprintDeletion] = useState<string | null>(null);
   const [moveNotice, setMoveNotice] = useState<CardMove | null>(null);
   const movedItems = moveNotice?.kind === "release" ? releases : tickets;
@@ -546,7 +563,7 @@ function App({
   }, []);
   useEffect(() => {
     pendingSave.current = {
-      data: { sprint, releases: toSavedItems(releases), tickets: toSavedItems(tickets) }, history,
+      data: { activeHistoryId, sprint, releases: toSavedItems(releases), tickets: toSavedItems(tickets) }, history,
     };
     const flush = async () => {
       if (saving.current || saveBlocked.current) return;
@@ -570,13 +587,13 @@ function App({
           setSaveError("");
         }
       } catch (cause) {
-        pendingSave.current ||= { data: { sprint, releases: toSavedItems(releases), tickets: toSavedItems(tickets) }, history };
+        pendingSave.current ||= { data: { activeHistoryId, sprint, releases: toSavedItems(releases), tickets: toSavedItems(tickets) }, history };
         setSaveError(cause instanceof Error ? cause.message : "La sauvegarde a échoué. Tes modifications restent affichées.");
       } finally { saving.current = false; }
     };
     const timer = window.setTimeout(() => { void flush(); }, 500);
     return () => window.clearTimeout(timer);
-  }, [sprint, releases, tickets, history, saveAttempt]);
+  }, [activeHistoryId, sprint, releases, tickets, history, saveAttempt]);
 
   // ==========================================
   // CALCULS
@@ -705,20 +722,53 @@ function App({
   // HISTORIQUE
   // ==========================================
 
-  const saveSprintToHistory = () => {
+  const saveSprintToHistory = (notify = true) => {
+    const existingId = history.some(item => item.id === activeHistoryId) ? activeHistoryId : null;
     const newItem: SprintHistoryItem = {
-      id: makeId(),
+      id: existingId || makeId(),
       savedAt: new Date().toISOString(),
-      sprint: { ...sprint },
+      sprint: { ...sprint, name: sprint.name.trim() || "Brouillon de sprint" },
       releases: toSavedItems(releases),
       tickets: toSavedItems(tickets),
     };
 
-    setHistory((previous) => [newItem, ...previous]);
-    alert(`${sprint.name} a été enregistré dans l'historique.`);
+    setHistory(previous => existingId
+      ? previous.map(item => item.id === existingId ? newItem : item)
+      : [newItem, ...previous]);
+    setActiveHistoryId(newItem.id);
+    if (notify) showAlert({
+      title: existingId ? "Rapport mis à jour" : "Rapport enregistré",
+      message: existingId
+        ? `Les modifications de ${sprint.name} ont été enregistrées.`
+        : `${sprint.name} a été enregistré dans l’historique.`,
+      tone: "success",
+    });
+  };
+
+  const createNewReport = () => {
+    setActiveHistoryId(null);
+    setSprint({ ...emptySprint });
+    setReleases([]);
+    setTickets([]);
+    setMoveNotice(null);
+    setConfirmNewReport(false);
+    setActiveTab("general");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.requestAnimationFrame(() => document.getElementById("sprint-name")?.focus());
+  };
+
+  const requestNewReport = () => {
+    const current = { sprint, releases: toSavedItems(releases), tickets: toSavedItems(tickets) };
+    const saved = history.find(item => item.id === activeHistoryId);
+    const baseline = saved
+      ? { sprint: saved.sprint, releases: saved.releases, tickets: saved.tickets }
+      : { sprint: emptySprint, releases: [], tickets: [] };
+    if (JSON.stringify(current) !== JSON.stringify(baseline)) setConfirmNewReport(true);
+    else createNewReport();
   };
 
   const loadSprintFromHistory = (item: SprintHistoryItem) => {
+    setActiveHistoryId(item.id);
     setSprint({ ...item.sprint });
     setReleases(toEditableItems(item.releases));
     setTickets(toEditableItems(item.tickets));
@@ -728,11 +778,13 @@ function App({
   };
 
   const deleteSprintFromHistory = (id: string) => {
+    if (activeHistoryId === id) setActiveHistoryId(null);
     setHistory((previous) => previous.filter((item) => item.id !== id));
     setPendingSprintDeletion(null);
   };
 
   const duplicateSprintFromHistory = (item: SprintHistoryItem) => {
+    setActiveHistoryId(null);
     setSprint({ ...item.sprint, name: `${item.sprint.name} (copie)` });
     setReleases(toEditableItems(item.releases));
     setTickets(toEditableItems(item.tickets));
@@ -988,9 +1040,9 @@ ${sprint.signatories}
       window.setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error("Erreur lors de la copie :", error);
-      alert(
-        "La copie HTML n'a pas fonctionné. Essaie de télécharger le rapport."
-      );
+      showAlert({ title: "Copie impossible", tone: "error",
+        message: "La copie HTML n’a pas fonctionné. Essaie de télécharger le rapport.",
+      });
     }
   };
 
@@ -1016,11 +1068,11 @@ ${sprint.signatories}
   // ==========================================
 
   return (
-    <div className="app">
+    <div className={`app ${activeTab === "general" ? "sprint-report-page" : ""}`}>
       {saveError && <div className="sprint-save-error" role="alert">
         <span>{saveError}</span>
         <button className="button button-quiet" onClick={() => {
-          const snapshot = { data: { sprint, releases: toSavedItems(releases), tickets: toSavedItems(tickets) }, history };
+          const snapshot = { data: { activeHistoryId, sprint, releases: toSavedItems(releases), tickets: toSavedItems(tickets) }, history };
           const url = URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" }));
           const link = document.createElement("a"); link.href = url; link.download = "sprintly-sauvegarde-personnelle.json"; link.click();
           window.setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -1109,24 +1161,37 @@ ${sprint.signatories}
         <div className="content">
           {/* TITRE DE LA PAGE */}
           <div className="page-heading report-page-heading">
-            <div>
+            <div className="report-heading-intro">
+              {activeTab === "general" && <span className={`report-mode-badge ${activeHistoryId ? "is-editing" : ""}`}>
+                <span aria-hidden="true" className="report-mode-dot" />
+                {activeHistoryId ? "Modification d’un rapport" : "Nouveau rapport"}
+              </span>}
               <h1>
                 {activeTab === "history" ? "Historique des sprints" : "Rapport de sprint"}
               </h1>
               <p>
                 {activeTab === "history"
                   ? "Retrouve, consulte ou duplique tes anciens rapports."
-                  : sprint.name}
+                  : activeHistoryId
+                    ? `Modification de ${sprint.name}`
+                    : "Prépare ton bilan, puis retrouve-le dans l’historique."}
               </p>
+              {activeTab === "general" && <span className="saved-status report-save-status">
+                <span aria-hidden="true">●</span> Sauvegarde automatique {activeHistoryId ? "activée" : "du brouillon"}
+              </span>}
             </div>
-            {activeTab === "general" && (
-              <div className="report-heading-actions">
-                <span className="saved-status">● Sauvegarde automatique</span>
-                <button type="button" className="button button-primary" onClick={saveSprintToHistory}>
-                  Enregistrer le rapport
+            <div className="report-heading-actions">
+              {activeTab === "general" && <>
+                <button type="button" className="button report-save-button" disabled={!sprint.name.trim()} onClick={() => saveSprintToHistory()}>
+                  {activeHistoryId ? "Enregistrer les modifications" : "Enregistrer le rapport"}
                 </button>
-              </div>
-            )}
+              </>}
+              <button type="button" className="button button-primary new-report-button"
+                onClick={requestNewReport}>
+                <span className="new-report-button-icon" aria-hidden="true"><NavIcon name="add" /></span>
+                Nouveau rapport
+              </button>
+            </div>
           </div>
 
           {/* ====================================== */}
@@ -1434,7 +1499,7 @@ ${sprint.signatories}
                 <div className="stat-card">
                   <div className="stat-top">
                     <div className="stat-label">Vélocité prévue</div>
-                    <div className="kpi-icon purple">◎</div>
+                    <div className="kpi-icon"><NavIcon name="target" /></div>
                   </div>
                   <div className="stat-value">
                     {sprint.plannedVelocity} <span>pts</span>
@@ -1445,12 +1510,12 @@ ${sprint.signatories}
                 <div className="stat-card">
                   <div className="stat-top">
                     <div className="stat-label">Vélocité réelle</div>
-                    <div className="kpi-icon green">↗</div>
+                    <div className="kpi-icon"><NavIcon name="trend" /></div>
                   </div>
                   <div className="stat-value">
                     {sprint.actualVelocity} <span>pts</span>
                   </div>
-                  <div className="stat-footer positive">
+                  <div className={`stat-footer ${sprint.plannedVelocity > 0 && velocityPercentage >= 100 ? "positive" : ""}`}>
                     {velocityPercentage >= 100 ? "+" : ""}
                     {velocityPercentage - 100}% de l'objectif
                   </div>
@@ -1467,7 +1532,7 @@ ${sprint.signatories}
                 <div className="stat-card">
                   <div className="stat-top">
                     <div className="stat-label">Points restants</div>
-                    <div className="kpi-icon orange">◷</div>
+                    <div className="kpi-icon"><NavIcon name="remaining" /></div>
                   </div>
                   <div className="stat-value">
                     {remainingPoints} <span>pts</span>
@@ -1478,7 +1543,7 @@ ${sprint.signatories}
                 <div className="stat-card">
                   <div className="stat-top">
                     <div className="stat-label">Effort bugs</div>
-                    <div className="kpi-icon red">⚑</div>
+                    <div className="kpi-icon"><NavIcon name="bug" /></div>
                   </div>
                   <div className="stat-value">
                     {sprint.bugPoints} <span>pts</span>
@@ -1495,7 +1560,7 @@ ${sprint.signatories}
                 <section className="form-panel">
                   <div className="panel-header">
                     <h2>Configuration du rapport</h2>
-                    <span className="step-badge">Édition</span>
+                    <span className="step-badge">5 étapes</span>
                   </div>
 
                   {/* INFORMATIONS GÉNÉRALES */}
@@ -1509,6 +1574,8 @@ ${sprint.signatories}
                         <label htmlFor="sprint-name">Nom du sprint</label>
                         <input
                           id="sprint-name"
+                          placeholder="Ex. Sprint 146"
+                          aria-required="true"
                           value={sprint.name}
                           onChange={(e) => updateSprint("name", e.target.value)}
                         />
@@ -1838,7 +1905,10 @@ ${sprint.signatories}
                 {/* APERÇU DU RAPPORT */}
                 <section className="preview-panel" aria-labelledby="preview-title">
                   <div className="panel-header preview-header">
-                    <h2 id="preview-title">Aperçu du rapport</h2>
+                    <div><h2 id="preview-title">Aperçu du rapport</h2><p className="preview-description">Le rendu de ton bilan, en temps réel.</p></div>
+                    <button type="button" className="button preview-expand-button" onClick={() => setPreviewExpanded(true)}>
+                      <NavIcon name="expand" /> Agrandir
+                    </button>
                     <div className="preview-actions">
                       <button
                         type="button"
@@ -1897,6 +1967,19 @@ ${sprint.signatories}
               </div>
             )}
           </div>
+
+          <ReportPreviewDialog open={previewExpanded} html={previewExpanded ? generateReport() : ""}
+            onClose={() => setPreviewExpanded(false)} onCopy={copyReport} onDownload={downloadReport} />
+
+          <ConfirmDialog
+            open={confirmNewReport}
+            title="Créer un nouveau rapport ?"
+            description="Le rapport en cours sera enregistré dans l’historique avant d’ouvrir un formulaire vierge. Tu pourras le retrouver et le modifier à tout moment."
+            confirmLabel="Enregistrer et créer"
+            tone="neutral"
+            onCancel={() => setConfirmNewReport(false)}
+            onConfirm={() => { saveSprintToHistory(false); createNewReport(); }}
+          />
 
           <ConfirmDialog
             open={!!pendingSprintDeletion}

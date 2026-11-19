@@ -85,3 +85,5 @@
     min-height: 44px;
   }
 }
+
+.confirm-dialog .confirm-dialog-icon-neutral { background: var(--card-background); color: var(--text-primary); border: 1px solid var(--card-border); }

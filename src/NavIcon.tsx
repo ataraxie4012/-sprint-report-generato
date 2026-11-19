@@ -1,6 +1,13 @@
 import chanelLogo from "./chanel-logo.png";
 
 const paths = {
+  close: "M6 6l12 12M18 6 6 18",
+  expand: "M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5M3 3l6 6M21 3l-6 6M3 21l6-6M21 21l-6-6",
+  target: "M21 12a9 9 0 1 1-9-9M17 3h4v4M21 3l-9 9M15 12a3 3 0 1 1-3-3",
+  trend: "m3 17 6-6 4 4 8-10M15 5h6v6",
+  remaining: "M12 3a9 9 0 1 0 9 9M12 7v5l3 2M16 3h5v5",
+  bug: "M8 8h8v8a4 4 0 0 1-8 0V8ZM9 8V6a3 3 0 0 1 6 0v2M3 10h5M16 10h5M3 15h5M16 15h5M5 21l4-3M19 21l-4-3M12 8v12",
+  add: "M12 5v14M5 12h14",
   duplicate: "M8 8h12v13H8V8ZM16 8V3H3v14h5",
   view: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Zm13 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z",
   trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
