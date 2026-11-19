@@ -42,6 +42,8 @@ export default function DocumentHub({
   const [view, setView] = useState<"editor" | "history">("editor");
   const [history, setHistory] = useState<DocumentHistoryItem[]>([]);
   const [historyError, setHistoryError] = useState("");
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [historyFilter, setHistoryFilter] = useState<"all" | "test" | "minutes">("all");
 
   useEffect(() => {
     const refresh = () => {
@@ -211,6 +213,14 @@ export default function DocumentHub({
     setStatus("Document téléchargé.");
   };
 
+  const normalizedQuery = historyQuery.trim().normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr-FR");
+  const filteredHistory = history.filter(item => {
+    const searchableText = (item.title + " " + documentTypes[item.type].title)
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr-FR");
+    return (historyFilter === "all" || item.type === historyFilter)
+      && searchableText.includes(normalizedQuery);
+  });
   const profileName = profileNameForEmail(email);
 
   return (
@@ -281,14 +291,6 @@ export default function DocumentHub({
         </div>
       </aside>
       <main className="main">
-        <header className="topbar">
-          <div className="breadcrumb">
-            Espace de travail / <strong>Documents</strong>
-            {view === "history"
-              ? <> / <strong>Anciens travaux</strong></>
-              : template && <> / <strong>{template.title}</strong></>}
-          </div>
-        </header>
       <div className="hub-content">
         {view === "history" ? (
           <section className="hub-choice document-history" aria-labelledby="document-history-title">
@@ -298,6 +300,33 @@ export default function DocumentHub({
               Ils sont conservés dans ce navigateur pour ton adresse e-mail.
             </p>
             {historyError && <p role="alert">{historyError}</p>}
+            {history.length > 0 && (
+              <div className="document-history-toolbar">
+                <div className="document-history-search">
+                  <label htmlFor="document-history-search">Rechercher un document</label>
+                  <input id="document-history-search" type="search"
+                    placeholder="Titre ou type de document…"
+                    value={historyQuery}
+                    onChange={event => setHistoryQuery(event.target.value)} />
+                </div>
+                <div className="document-history-filters" role="group" aria-label="Filtrer par type de document">
+                  {([
+                    ["all", "Tous"],
+                    ["test", "Tests"],
+                    ["minutes", "Comptes rendus"],
+                  ] as const).map(([value, label]) => (
+                    <button type="button" key={value}
+                      aria-pressed={historyFilter === value}
+                      onClick={() => setHistoryFilter(value)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <span className="document-history-result-count" role="status">
+                  {filteredHistory.length} document{filteredHistory.length > 1 ? "s" : ""}
+                </span>
+              </div>
+            )}
             {history.length === 0 ? (
               <div className="document-history-empty">
                 <h2>Aucun document enregistré</h2>
@@ -308,21 +337,38 @@ export default function DocumentHub({
               </div>
             ) : (
               <div className="document-history-list">
-                {history.map(item => (
+                {filteredHistory.length === 0 && (
+                  <div className="document-history-empty">
+                    <h2>Aucun document trouvé</h2>
+                    <p>Essaie un autre titre ou un autre type de document.</p>
+                    <button className="button button-secondary" onClick={() => {
+                      setHistoryQuery("");
+                      setHistoryFilter("all");
+                    }}>Réinitialiser les filtres</button>
+                  </div>
+                )}
+                {filteredHistory.map(item => (
                   <article className="document-history-card" key={item.id}>
                     <div>
-                      <span className="document-history-kind" data-type={item.type}>
-                        <NavIcon name={item.type} />
-                        {documentTypes[item.type].title}
-                      </span>
                       <h2>{item.title}</h2>
-                      <p>
-                        {item.date && <>Date du document {new Date(item.date + "T12:00:00").toLocaleDateString("fr-FR")} · </>}
-                        Enregistré le {new Date(item.savedAt).toLocaleString("fr-FR")}
-                      </p>
+                      <div className="document-history-details">
+                        <span className="document-history-kind" data-type={item.type}>
+                          <NavIcon name={item.type} />
+                          {documentTypes[item.type].title}
+                        </span>
+                        <time dateTime={item.savedAt}>
+                          Enregistré le {new Date(item.savedAt).toLocaleString("fr-FR", {
+                            day: "2-digit", month: "short", year: "numeric",
+                            hour: "2-digit", minute: "2-digit",
+                          })}
+                        </time>
+                        {item.date && (
+                          <span>Document du {new Date(item.date + "T12:00:00").toLocaleDateString("fr-FR")}</span>
+                        )}
+                      </div>
                     </div>
                     <button className="button button-secondary" onClick={() => openSavedDocument(item)}>
-                      Ouvrir
+                      <NavIcon name="view" /> Consulter
                     </button>
                   </article>
                 ))}
@@ -333,7 +379,7 @@ export default function DocumentHub({
           <>
         <section className="hub-choice" aria-labelledby="hub-title">
           <h1 id="hub-title">Quel document veux-tu préparer ?</h1>
-          <p>Choisis le format adapté à ton travail.</p>
+
           <div>
             <label htmlFor="document-type">Type de document</label>
             <div className="hub-choice-controls">
@@ -451,11 +497,11 @@ export default function DocumentHub({
                 sandbox=""
               />
               <div className="hub-preview-actions">
-                <button className="button button-secondary" onClick={saveDocument} disabled={generating}>
+                <button className="button button-primary" onClick={saveDocument} disabled={generating}>
                   {savedDocumentId ? "Enregistrer les modifications" : "Enregistrer le document"}
                 </button>
-                <button className="button button-primary" onClick={copyDocument}>Copier</button>
-                <button className="button button-secondary" onClick={downloadDocument}>Télécharger le HTML</button>
+                <button className="button button-secondary" onClick={copyDocument}>Copier</button>
+                <button className="button button-quiet" onClick={downloadDocument}>Télécharger le HTML</button>
               </div>
               <p role="status">{status}</p>
             </div>

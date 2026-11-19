@@ -1069,44 +1069,27 @@ ${sprint.signatories}
 
       {/* CONTENU PRINCIPAL */}
       <main className="main">
-        <header className="topbar">
-          <div className="topbar-brand">
-            <div className="breadcrumb">
-              Espace de travail /{" "}
-              <strong>
-                {activeTab === "history" ? "Historique" : "Rapport de sprint"}
-              </strong>
-            </div>
-          </div>
-
-          <div className="topbar-actions">
-            <span className="saved-status">● Sauvegarde automatique</span>
-            {activeTab === "general" && (
-              <button
-                type="button"
-                className="button button-primary"
-                onClick={saveSprintToHistory}
-              >
-                Enregistrer le rapport
-              </button>
-            )}
-          </div>
-        </header>
-
         <div className="content">
           {/* TITRE DE LA PAGE */}
-          <div className="page-heading">
-            <div className="eyebrow">GESTION DES SPRINTS</div>
-            <h1>
-              {activeTab === "history"
-                ? "Historique des sprints"
-                : "Rapport de sprint"}
-            </h1>
-            <p style={{ color: "#888888", fontSize: 13 }}>
-              {activeTab === "history"
-                ? "Retrouve, consulte ou duplique tes anciens rapports."
-                : "Configure tes données et génère automatiquement ton rapport."}
-            </p>
+          <div className="page-heading report-page-heading">
+            <div>
+              <h1>
+                {activeTab === "history" ? "Historique des sprints" : "Rapport de sprint"}
+              </h1>
+              <p>
+                {activeTab === "history"
+                  ? "Retrouve, consulte ou duplique tes anciens rapports."
+                  : sprint.name}
+              </p>
+            </div>
+            {activeTab === "general" && (
+              <div className="report-heading-actions">
+                <span className="saved-status">● Sauvegarde automatique</span>
+                <button type="button" className="button button-primary" onClick={saveSprintToHistory}>
+                  Enregistrer le rapport
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ====================================== */}
@@ -1822,14 +1805,14 @@ ${sprint.signatories}
                     <div className="preview-actions">
                       <button
                         type="button"
-                        className="button button-primary"
+                        className="button button-secondary"
                         onClick={copyReport}
                       >
                         {copied ? "✓ Rapport copié !" : "Copier le rapport"}
                       </button>
                       <button
                         type="button"
-                        className="button button-secondary"
+                        className="button button-quiet"
                         onClick={downloadReport}
                       >
                         Télécharger le HTML

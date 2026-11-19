@@ -5,6 +5,7 @@ import Login from './Login.tsx'
 import { initializeTheme } from './theme'
 import './darkMode.css'
 import './responsive.css'
+import './uiRefinements.css'
 
 initializeTheme()
 
